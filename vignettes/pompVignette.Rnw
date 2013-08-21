@@ -1,0 +1,88 @@
+\documentclass[12pt]{article} % article?
+\usepackage{geometry} %
+\geometry{a4paper} % or letter or a5paper or ... etc
+\usepackage{graphicx}
+\usepackage{amssymb,amsmath}
+\geometry{letterpaper, top=1in, left=1in, right=1in, bottom=1in} % to set margins
+
+
+
+\title{pomp sandbox}
+\author{Nicholas G Reich}
+
+%%% BEGIN DOCUMENT
+\begin{document}
+
+%opts_chunk$set(concordance=TRUE, tidy=TRUE)
+
+\maketitle
+
+\section{The model}
+We specify a model for a univariate time series, measured in discrete time units. Say that $Y_t$ are the number of observed cases of disease at a particular time $t$. Furthermore, $X_t$ are the total number of cases occuring at time $t$. A very simple toy model that tries to capture both the underlying disease process and the observation process might look like the following:
+\begin{eqnarray}
+X_t|X_{t-1} & \sim & Poisson(\lambda_t) \\ 
+\log \lambda_t & = & \beta \cdot \log X_{t-1} + \alpha_{t_{mod}S}  \\ 
+Y_t | X_t & \sim & Binomial(p_t, N)
+\end{eqnarray}
+where the $\alpha_t$ coefficients (there are $S$ of them) represent the seasonal baselines, and $p_t$ are time-varying case-reporting probabilities.
+
+\section{Using {\tt pomp} to work with this model}
+Following along the "introduction to pomp" vignette, we will write a function that implements the process model simulator: simulating a single step of the unobserved process. 
+<<setup, message=FALSE>>=
+require(pomp)
+proc.sim <- function(x, t, params, delta.t, ...) {
+        ## unpack the params vector:
+        S <- params["S"]
+        t.seas <- t%%S
+        alpha.string <- paste0("alpha", t.seas)
+        alpha <- params[alpha.string]
+        beta <- params["beta"]
+        ## state at time t:
+        X <- x["X"]
+        ## compute the state at time t+delta.t
+        log.lambda <- beta*log(X) + alpha
+        xnew <- c(X=unname( rpois(n=1, lambda=exp(log.lambda)) ))
+        return(xnew)
+}
+@
+
+Next, we will implement a simulator for the observation process.
+<<obsProcess>>=
+meas.sim <- function(x, t, params, ...){
+        ## unpack the parameters:
+        p <- params["p"]
+        ## state at time t:
+        X <- x["X"]
+        ## generate a simulated observation:
+        y <- c(Y=unname( rbinom(n=1, size=X, prob=p) ))
+        return(y)
+}
+@
+
+For now, am leaving out the {\tt meas.dens} function. Will try to simulate the full model.
+
+<<simModel>>=
+mod1 <- pomp(
+        data=data.frame(time=1:100,Y=NA),
+        times="time",
+        rprocess=discrete.time.sim(
+                step.fun=proc.sim,
+                delta.t=1),
+        rmeasure=meas.sim,
+        t0=0
+        )
+@
+
+Also, we need to define a parameter vector, and then we can simulate!
+<<paramVec>>=
+theta <- c(beta=1, S=4, alpha0=.5, alpha1=.7, alpha2=.9, alpha3=-2.1, p=0.1, X.0=100)
+mod1 <- simulate(mod1, params=theta)
+plot(mod1, variables="Y")
+@
+
+
+
+
+
+
+\end{document}
