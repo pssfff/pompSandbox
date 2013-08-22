@@ -1,0 +1,7 @@
+base
+deSolve
+ggplot2
+knitr
+mvtnorm
+pomp
+subplex

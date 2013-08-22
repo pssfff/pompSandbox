@@ -22,7 +22,7 @@ We specify a model for a univariate time series, measured in discrete time units
 \begin{eqnarray}
 X_t|X_{t-1} & \sim & Poisson(\lambda_t) \\ 
 \log \lambda_t & = & \beta \cdot \log X_{t-1} + \alpha_{t_{mod}S}  \\ 
-Y_t | X_t & \sim & Binomial(p_t, N)
+Y_t | X_t & \sim & Binomial(p_t, X_t)
 \end{eqnarray}
 where the $\alpha_t$ coefficients (there are $S$ of them) represent the seasonal baselines, and $p_t$ are time-varying case-reporting probabilities.
 
@@ -80,7 +80,87 @@ mod1 <- simulate(mod1, params=theta)
 plot(mod1, variables="Y")
 @
 
+Now, we can define the measurement model density, so that we can fit models.
+<<measDens>>=
+meas.dens <- function(y, x, t, params, log, ...){
+        ## unpack the parameters:
+        p <- params["p"]
+        ## state at time t:
+        X <- x["X"]
+        ## observation at time t:
+        Y <- y["Y"]
+        ## compute the likelihood of Y|X, p:
+        f <- dbinom(x=Y, size=X, prob=p, log=log)
+        return(f)
+}
+mod1 <- pomp(mod1, dmeasure=meas.dens)
+@
 
+Now, we can estimate the likelhood at the true parameters:
+<<simplePF, cache=TRUE>>=
+pf <- pfilter(mod1, params=theta, Np=1000)
+(loglik.truth <- logLik(pf))
+@
+
+
+Can also calculate the likelihood for another ``guess'' at theta.
+<<thetaGuess, cache=TRUE>>=
+theta.true <- coef(mod1)
+theta.guess <- theta.true
+theta.guess[c("p", "alpha0", "alpha1", "alpha2")] <- 1.1*theta.true[c("p", "alpha0", "alpha1", "alpha2")]
+pf.guess <- pfilter(mod1, params=theta.guess, Np=1000)
+(loglik.truth <- logLik(pf.guess))
+@
+
+Before we get into some more heavy lifting with particle filtering, we need to set a parameter transformation for $p$, the only parameter that needs it in this model.
+<<paramTransform>>=
+mod1 <- pomp(mod1, 
+             ## from the estimation scale (real line) to natural scale (0-1)
+             parameter.transform = function(params, ...) {
+                     p <- params["p"]
+                     params["p"] <- exp(p)/(exp(p)+1)
+                     return(params)
+             },
+             ## from the natural scale to the estimation scale
+             parameter.inv.transform = function(params, ...) {
+                     p <- params["p"]
+                     params["p"] <- log(p/(1-p))
+                     return(params)             
+             }
+)
+@
+
+Now, let's try running an multiple iterated filtering algorithm to estimate our parameters.
+<<mif, cache=TRUE>>=
+estpars <- c("p") #, "alpha0", "alpha1", "alpha2", "alpha3", "beta")
+replicate(n=5, 
+          {
+                theta.guess <- theta.true
+                ## redraw p guesses from beta distribution with mean p
+                a = 10
+                p <- theta.true["p"]
+                b = a*(1-p)/p
+                theta.guess["p"] <- rbeta(1, shape1=a, shape2=b)
+                rw.sds <- c(p=0.02)
+                mif(
+                        mod1,
+                        Nmif=10,
+                        start=theta.guess,
+                        transform=TRUE,
+                        pars=estpars,
+                        rw.sd=rw.sds,
+                        Np=2000,
+                        var.factor=4,
+                        ic.lag=10,
+                        cooling.factor=0.999,
+                        max.fail=10
+                ) }
+) -> mf
+@
+
+<<compare>>=
+compare.mif(mf)
+@
 
 
 
