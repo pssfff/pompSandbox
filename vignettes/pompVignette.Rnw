@@ -5,9 +5,11 @@
 \usepackage{amssymb,amsmath}
 \geometry{letterpaper, top=1in, left=1in, right=1in, bottom=1in} % to set margins
 
+\usepackage{setspace}
+\onehalfspacing
 
 
-\title{pomp sandbox}
+\title{{\tt pomp} sandbox}
 \author{Nicholas G Reich}
 
 %%% BEGIN DOCUMENT
@@ -162,6 +164,9 @@ replicate(n=5,
 compare.mif(mf)
 @
 
+<<sessionInfo>>=
+sessionInfo()
+@
 
 
 
