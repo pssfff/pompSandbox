@@ -19,7 +19,7 @@
 \maketitle
 
 
-\section{The model}
+\section{The disease transmission model}
 We specify a model for a univariate time series, measured in discrete time units. Say that $Y_{i,t}$ are the number of observed cases of disease $i$ within a particular time window $t$. Furthermore, $X_{i,t}$ are the total number of cases occuring in time $t$. The theoretical transmission model (adapted from Finkenstadt and Grenfell) could be written as
 \begin{equation}
 X_{i,t} = \beta_t \cdot X_{i,t-1}^{\alpha_1} \cdot S_{i,t-1}^{\alpha_2}
@@ -32,11 +32,15 @@ The $\alpha$ are mixing parameters, which, if both equal 1, define a population 
 
 Therefore, a statistical formulation of the theoretical transmission model would be
 \begin{eqnarray}
-{\mathbb E}[ X_{i,t}|X_{\cdot,t-1}, S_{i,t-1}] & = & \lambda_t \\ 
-\log \lambda_t & = & \log\beta_t + \alpha_1 \log X_{t-1} + \alpha_2 \log S_{i,t-1}
+{\mathbb E}[ X_{i,t}|X_{\cdot,t-1}, S_{i,t-1}] & = & \log\beta_t + \alpha_1 \log X_{t-1} + \alpha_2 \log S_{i,t-1}
 \end{eqnarray}
 where the $\alpha_t$ coefficients (there are $S$ of them) represent the seasonal baselines, and $p_t$ are time-varying case-reporting probabilities. We intentionally leave the distributional assumption for $X_{i,t}$ unspecified for now, although it would likely be specified as Poisson or Negative Binomial.
 
+The heart of this model resides in our definition of the $S_{i,t}$. In the past, we have defined this measure of susceptibility along these lines:
+\begin{eqnarray}
+S_{i,t} & = & S_{i,t-1} + B_{t-d} - I_{i,t} -\delta\sum_{j\neq i}[I_{j,t-1}- I_{j,t-(k+1)}]. 
+\end{eqnarray}
+\section{The model for an observation process}
 And the observation process could be modeled as 
 \begin{eqnarray}
 Y_{i,t} | X_{i,t} & \sim & Binomial(p_{i,t}, X_{i,t})
