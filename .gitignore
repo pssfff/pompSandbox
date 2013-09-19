@@ -3,3 +3,12 @@
 
 # Example code in package build process
 *-Ex.R
+.Rproj.user
+*.Rproj
+
+# latex auxilliary files
+*.bbl
+*.log
+*.synctex.gz
+*.DS_Store
+*-concordance.tex
