@@ -12,3 +12,6 @@
 *.synctex.gz
 *.DS_Store
 *-concordance.tex
+
+# folder with knitted figures
+vignettes/figure/
