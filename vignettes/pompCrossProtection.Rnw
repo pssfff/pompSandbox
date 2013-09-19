@@ -27,7 +27,11 @@ X_{i,t} = \beta_t \cdot X_{i,t-1}^{\alpha_1} \cdot S_{i,t-1}^{\alpha_2}
 where $S_{i,t}$ is the number of susceptible individuals to disease $i$ at time $t$ and 
 % lifted from supplemental materials of JRSI paper
 the $\beta_t$ are a time-varying transmission parameters.  
-The $\alpha$ are mixing parameters, which, if both equal 1, define a population with homogeneous mixing whereas values not equal to 1 have been used to describe departures from mass-action mixing \cite{liu1987dynamical} and to account for discretization of continuous time transmission processes \cite{glass2003interpreting}.
+The $\alpha$ are mixing parameters, which, if both equal 1, define a population with homogeneous mixing whereas values not equal to 1 have been used to describe departures from mass-action mixing 
+%\cite{liu1987dynamical} 
+and to account for discretization of continuous time transmission processes 
+%\cite{glass2003interpreting}
+.
 
 
 Therefore, a statistical formulation of the theoretical transmission model would be
