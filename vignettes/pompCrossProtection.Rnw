@@ -38,12 +38,40 @@ Therefore, a statistical formulation of the theoretical transmission model would
 \begin{eqnarray}
 {\mathbb E}[ X_{i,t}|X_{\cdot,t-1}, S_{i,t-1}] & = & \log\beta_t + \alpha_1 \log X_{t-1} + \alpha_2 \log S_{i,t-1}
 \end{eqnarray}
-where the $\alpha_t$ coefficients (there are $S$ of them) represent the seasonal baselines, and $p_t$ are time-varying case-reporting probabilities. We intentionally leave the distributional assumption for $X_{i,t}$ unspecified for now, although it would likely be specified as Poisson or Negative Binomial.
+where the $\beta_t$ coefficients represent the seasonal baselines, i.e. $\beta_t = \beta_{t \mod 26}$ if our timestep is biweeks, and $p_t$ are time-varying case-reporting probabilities. We intentionally leave the distributional assumption for $X_{i,t}$ unspecified for now, although it would likely be specified as Poisson or Negative Binomial.
 
 The heart of this model resides in our definition of the $S_{i,t}$. In the past, we have defined this measure of susceptibility along these lines:
 \begin{eqnarray}
-S_{i,t} & = & S_{i,t-1} + B_{t-d} - I_{i,t} -\delta\sum_{j\neq i}[I_{j,t-1}- I_{j,t-(k+1)}]. 
+S_{i,t} & = &  B_{t-d} + S_{i,t-1} - I_{i,t} - \delta \cdot Q_{-i,t} \label{eq:generalSuscModel}
+%S_{i,t} & = & S_{i,t-1} + B_{t-d} - I_{i,t} -\delta\sum_{j\neq i}[I_{j,t-1}- I_{j,t-(k+1)}]. 
 \end{eqnarray}
+where the $Q_{-i,t}$ term may take on different forms depending on the mechanistic process assumed about how individuals enter and leave the pool of susceptible individuals based on cross-protection and enhancement. For the moment, we might assume a model with a fixed duration of cross-protection, in which case, $Q_{-i,t} = \sum_{j\neq i}[I_{j,t-1}- I_{j,t-(k+1)}]$.
+
+Based on the above formulation, we can write a process simulator function based on the {\tt pomp} package format.
+<<processSimulatorDefine, message=FALSE>>=
+require(pomp)
+proc.sim <- function(x, t, params, delta.t, ...) {
+        ## unpack the params vector:
+        ##  biweek
+        biweek <- params["biweek"]
+        beta.string <- paste0("beta", biweek)
+        ## beta1, ...., beta26
+        beta_t <- params[beta.string]
+        ## alpha1 and alpha2
+        alpha1 <- params["alpha1"]
+        alpha2 <- params["alpha2"]
+        ## CP params: delta and k
+        delta <- params["delta"]
+        k <- params["k"]
+        ## state at time t:
+        X <- x["X"]
+        ## compute the state at time t+delta.t
+        log.lambda <- beta*log(X) + alpha
+        xnew <- c(X=unname( rpois(n=1, lambda=exp(log.lambda)) ))
+        return(xnew)
+}
+@
+
 \section{The model for an observation process}
 And the observation process could be modeled as 
 \begin{eqnarray}
