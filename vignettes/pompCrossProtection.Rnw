@@ -36,7 +36,7 @@ and to account for discretization of continuous time transmission processes
 
 Therefore, a statistical formulation of the theoretical transmission model would be
 \begin{eqnarray}
-{\mathbb E}[ X_{i,t}|X_{\cdot,t-1}, S_{i,t-1}] & = & \log\beta_t + \alpha_1 \log X_{t-1} + \alpha_2 \log S_{i,t-1}
+\log {\mathbb E}[ X_{i,t}|X_{\cdot,t-1}, S_{i,t-1}] & = & \log\beta_t + \alpha_1 \log X_{t-1} + \alpha_2 \log S_{i,t-1}
 \end{eqnarray}
 where the $\beta_t$ coefficients represent the seasonal baselines, i.e. $\beta_t = \beta_{t \mod 26}$ if our timestep is biweeks, and $p_t$ are time-varying case-reporting probabilities. We intentionally leave the distributional assumption for $X_{i,t}$ unspecified for now, although it would likely be specified as Poisson or Negative Binomial.
 
@@ -45,7 +45,7 @@ The heart of this model resides in our definition of the $S_{i,t}$. In the past,
 S_{i,t} & = &  B_{t-d} + S_{i,t-1} - I_{i,t} - \delta \cdot Q_{-i,t} \label{eq:generalSuscModel}
 %S_{i,t} & = & S_{i,t-1} + B_{t-d} - I_{i,t} -\delta\sum_{j\neq i}[I_{j,t-1}- I_{j,t-(k+1)}]. 
 \end{eqnarray}
-where the $Q_{-i,t}$ term may take on different forms depending on the mechanistic process assumed about how individuals enter and leave the pool of susceptible individuals based on cross-protection and enhancement. For the moment, we might assume a model with a fixed duration of cross-protection, in which case, $Q_{-i,t} = \sum_{j\neq i}[I_{j,t-1}- I_{j,t-(k+1)}]$.
+where the $Q_{-i,t}$ term may take on different forms depending on the mechanistic process assumed about how individuals enter and leave the pool of susceptible individuals based on cross-protection and enhancement. For the moment, we might assume a model with a fixed duration of cross-protection, in which case, $Q_{-i,t}(k) = \sum_{j\neq i}[I_{j,t-1}- I_{j,t-(k+1)}]$ where $Q$ depends on  $k$ is the fixed duration of cross protection.
 
 Based on the above formulation, we can write a process simulator function based on the {\tt pomp} package format.
 <<processSimulatorDefine, message=FALSE>>=
@@ -81,4 +81,86 @@ Y_{i,t} | X_{i,t} & \sim & Binomial(p_{i,t}, X_{i,t})
 where the $p_{i,t}$ are calculated based on, say, a standard susceptible reconstruction. It would probably even be more accurate to say that $p_{i,t}\sim Beta(a,b)$ such that the mean of the beta distribution is equal to that of the estimated $p$ from the susceptible reconstruction, and the variance is equal to that of resulting from the fit.
 %some known disease-specific reporting fractions that are varying over time and $N_t$ is the total number of cases of any disease under consideration observed at time $t$. For example, we observe four under-reported serotype-specific case counts over time (the $Y_{i,t}$, or more succinctly, the $\bm{Y_t}$ and one total case count ($N_t$). Then, the $\bm{p_t}$ could be estimated by $p_{i,t} = \frac{Y_{i,t}}{N_t}$. 
 
+\section{A simple cross-protection model}
+Let's start with a similar but simpler version of the model presented above:
+\begin{eqnarray}
+\log {\mathbb E}[ X_{i,t}|X_{\cdot,t-1}, S_{i,t-1}] & = & \log\beta + \alpha_1 \log X_{t-1} + \alpha_2 \log S_{i,t-1}\\
+S_{i,t} & = &  B + S_{i,t-1} - \sum_j I_{j,t} +  \\
+C_{i,t} & = &  C_{i,t-1} + \sum{j \neq i}X_{j,t}\\
+Q_{-i,t} & = &  \sum_{j\neq i}[I_{j,t-1}- I_{j,t-(k+1)}]
+\end{eqnarray}
+Major departures from above models:
+\begin{itemize}
+\item Assume only two strains.
+\item Assume $\beta$ is constant.
+\item Assume births are constant B.
+\item assume k is known and equals 2.
+\end{itemize}
+
+<<simpleProcSim>>=
+toy.proc.sim <- function(x, t, params, delta.t, ...) {
+        ## unpack the params vector:
+        beta <- params["beta"]
+        alpha1 <- params["alpha1"]
+        alpha2 <- params["alpha2"]
+        lambda <- params["lambda"]
+        mu <- params["mu"]
+        N <- params["N"]
+        iota <- params["iota"]
+        ## CP params: delta and k
+        delta <- params["delta"]
+        k <- params["k"]
+        ## copy x for easy access
+        newx <- x
+        ## transitions for strain 1
+        newx["I1"] <- rpois(1, beta*((x["I1"]/N+iota)^alpha1)*(x["S1"]^alpha2))
+        C1.loss <- rpois(1, lambda*x["C1"]) ## Poisson approximation to exponential loss from C1
+        ## transitions for strain 2
+        newx["I2"] <- rpois(1, beta*((x["I2"]/N+iota)^alpha1)*(x["S2"]^alpha2))
+        C2.loss <- rpois(1, lambda*x["C2"]) ## Poisson approximation to exponential loss from C2
+        ## udpate counts
+        newx["S1"] <- x["S1"] + N*mu - newx["I1"] - newx["I2"] + C1.loss
+        newx["S2"] <- x["S2"] + N*mu - newx["I2"] - newx["I1"] + C2.loss
+        newx["C1"] <- x["C1"] - C1.loss + newx["I2"]
+        newx["C2"] <- x["C2"] - C2.loss + newx["I1"]
+        return(newx[c("S1", "I1", "C1", "S2", "I2", "C2")])
+}
+
+toy.meas.sim <- function(x, t, params, ...) {
+        unname(x["I1"], x["I2"])
+}
+@
+
+And now we can simulate this framework
+<<simulateToyTSIR, cache=TRUE>>=
+simulate(
+        pomp(
+                data=data.frame(
+                        time=seq(0, 1000,by=1),
+                        y1=NA
+                ),
+                times="time",
+                t0=0,
+                rprocess=discrete.time.sim(
+                        step.fun=toy.proc.sim,
+                        delta.t=1
+                ),
+                rmeasure=toy.meas.sim,
+                ic.pars=c("S1.0","I1.0","C1.0", 
+                          "S2.0","I2.0","C2.0"), # initial condition parameters 
+                comp.names=c("S1","I1","C1", "S2","I2","C2") # names of the compartments
+        ),
+        params=c(
+                N=50000,
+                mu=1/50,
+                beta=1.2,alpha1=1,alpha2=1,
+                iota=1/1000,
+                lambda=1/10,
+                S1.0=40000,I1.0=500,C1.0=100,
+                S2.0=40000,I2.0=2000,C2.0=100
+        ),
+        seed=677573454L
+) -> tsir
+plot(tsir, variables=c("I1","I2", "C1", "S1", "S2","C2"))
+@
 \end{document}
