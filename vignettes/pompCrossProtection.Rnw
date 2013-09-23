@@ -82,20 +82,47 @@ where the $p_{i,t}$ are calculated based on, say, a standard susceptible reconst
 %some known disease-specific reporting fractions that are varying over time and $N_t$ is the total number of cases of any disease under consideration observed at time $t$. For example, we observe four under-reported serotype-specific case counts over time (the $Y_{i,t}$, or more succinctly, the $\bm{Y_t}$ and one total case count ($N_t$). Then, the $\bm{p_t}$ could be estimated by $p_{i,t} = \frac{Y_{i,t}}{N_t}$. 
 
 \section{A simple cross-protection model}
-Let's start with a similar but simpler version of the model presented above:
-\begin{eqnarray}
-\log {\mathbb E}[ X_{i,t}|X_{\cdot,t-1}, S_{i,t-1}] & = & \log\beta + \alpha_1 \log X_{t-1} + \alpha_2 \log S_{i,t-1}\\
-S_{i,t} & = &  B + S_{i,t-1} - \sum_j I_{j,t} +  \\
-C_{i,t} & = &  C_{i,t-1} + \sum{j \neq i}X_{j,t}\\
-Q_{-i,t} & = &  \sum_{j\neq i}[I_{j,t-1}- I_{j,t-(k+1)}]
-\end{eqnarray}
-Major departures from above models:
+%Let's start with a similar but simpler version of the model presented above:
+%\begin{eqnarray}
+%\log {\mathbb E}[ X_{i,t}|X_{\cdot,t-1}, S_{i,t-1}] & = & \log\beta + \alpha_1 \log X_{t-1} + \alpha_2 \log S_{i,t-1}\\
+%S_{i,t} & = &  B + S_{i,t-1} - \sum_j I_{j,t} +  \\
+%C_{i,t} & = &  C_{i,t-1} + \sum{j \neq i}X_{j,t} \\
+%Q_{-i,t} & = &  \sum_{j\neq i}[I_{j,t-1}- I_{j,t-(k+1)}]
+%\end{eqnarray}
+I created a model that is similar to the theoretical four-strain model shown above but with a few major departures from the above models:
 \begin{itemize}
 \item Assume only two strains.
 \item Assume $\beta$ is constant.
 \item Assume births are constant B.
 \item assume k is known and equals 2.
 \end{itemize}
+
+\begin{table}[htdp]
+\caption{Toy model parameters}
+\begin{center}
+\begin{tabular}{ll}
+\bf parameter & \bf description \\ 
+\hline
+$\beta$ & contact rate \\ 
+$\lambda$ & 1/mean duration of cross-protection \\
+$\alpha_1$, $\alpha_2$ & mixing parameters \\ 
+$N$ & population size \\
+$\mu$ & birth rate \\ 
+$\iota$ & rate of imported infections \\ 
+\end{tabular}
+\end{center}
+\label{toyParams}
+\end{table}%
+
+
+Model parameters are shown in Table \ref{toyParams}. The model was initialized with a vector of six initial values for the $S$, $I$ and $CP$ compartments for each strain and was simulated using the following framework:
+\begin{eqnarray}
+I_{i,t} & \sim & Poisson\left ( \beta \cdot (\frac{I_{i,t-1}}{N}+\iota)^{\alpha_1}\cdot S_{i,t-1}^{\alpha_2}\right ) \\
+NS_{i,t} & \sim & Poisson(\lambda \cdot CP_{i,t-1}) \\
+S_{i,t} & = & S_{i,t-1} + N\cdot\mu - \sum_{\forall j} I_{j,t} + NS_{1,t} \\ 
+CP_{i,t} & = & CP_{i,t-1} - NS_{i,t} + \sum_{j\neq i}I_{j,t} 
+\end{eqnarray}
+Note that the $NS$ quantity stands for ``newly susceptible'', i.e. these are the individuals who are heading out of the cross-protected state ($CP$) and back to being susceptible. The trick that we have used here is that by assuming the cross protection is exponentially distributed and by keeping track explicitly of $CP_{i,t}$ we can use the memoryless property of exponential survival to calculate how many individuals will leave the CP class only using the current count of inviduals in CP and $\lambda$. Currently am implementing this by drawing a Poisson with mean $\lambda\cdot CP_t$, but is this completely right? 
 
 <<simpleProcSim>>=
 toy.proc.sim <- function(x, t, params, delta.t, ...) {
@@ -107,17 +134,14 @@ toy.proc.sim <- function(x, t, params, delta.t, ...) {
         mu <- params["mu"]
         N <- params["N"]
         iota <- params["iota"]
-        ## CP params: delta and k
-        delta <- params["delta"]
-        k <- params["k"]
         ## copy x for easy access
         newx <- x
-        ## transitions for strain 1
+        ## transitions for each strain
         newx["I1"] <- rpois(1, beta*((x["I1"]/N+iota)^alpha1)*(x["S1"]^alpha2))
-        C1.loss <- rpois(1, lambda*x["C1"]) ## Poisson approximation to exponential loss from C1
-        ## transitions for strain 2
         newx["I2"] <- rpois(1, beta*((x["I2"]/N+iota)^alpha1)*(x["S2"]^alpha2))
-        C2.loss <- rpois(1, lambda*x["C2"]) ## Poisson approximation to exponential loss from C2
+        ## Poisson approximation to exponential losses
+        C1.loss <- rpois(1, lambda*x["C1"]) 
+        C2.loss <- rpois(1, lambda*x["C2"]) 
         ## udpate counts
         newx["S1"] <- x["S1"] + N*mu - newx["I1"] - newx["I2"] + C1.loss
         newx["S2"] <- x["S2"] + N*mu - newx["I2"] - newx["I1"] + C2.loss
@@ -127,7 +151,11 @@ toy.proc.sim <- function(x, t, params, delta.t, ...) {
 }
 
 toy.meas.sim <- function(x, t, params, ...) {
-        unname(x["I1"], x["I2"])
+        rho1 <- params["rho1"]
+        rho2 <- params["rho2"]
+        y1 <- rbinom(1, size=x["I1"], prob=rho1)
+        y2 <- rbinom(1, size=x["I2"], prob=rho2)
+        unname(c(y1, y2))
 }
 @
 
@@ -137,7 +165,8 @@ simulate(
         pomp(
                 data=data.frame(
                         time=seq(0, 1000,by=1),
-                        y1=NA
+                        y1=NA,
+                        y2=NA
                 ),
                 times="time",
                 t0=0,
@@ -146,21 +175,24 @@ simulate(
                         delta.t=1
                 ),
                 rmeasure=toy.meas.sim,
+                # initial condition parameters 
                 ic.pars=c("S1.0","I1.0","C1.0", 
-                          "S2.0","I2.0","C2.0"), # initial condition parameters 
-                comp.names=c("S1","I1","C1", "S2","I2","C2") # names of the compartments
+                          "S2.0","I2.0","C2.0"), 
+                # names of the compartments
+                comp.names=c("S1","I1","C1", "S2","I2","C2") 
         ),
         params=c(
                 N=50000,
                 mu=1/50,
+                rho1=.5, rho2=.1,
                 beta=1.2,alpha1=1,alpha2=1,
                 iota=1/1000,
-                lambda=1/10,
+                lambda=1/50,
                 S1.0=40000,I1.0=500,C1.0=100,
                 S2.0=40000,I2.0=2000,C2.0=100
         ),
         seed=677573454L
 ) -> tsir
-plot(tsir, variables=c("I1","I2", "C1", "S1", "S2","C2"))
+plot(tsir, variables=c("y1", "y2", "C1","C2", "I1","I2", "S1", "S2"))
 @
 \end{document}
