@@ -81,7 +81,7 @@ Y_{i,t} | X_{i,t} & \sim & Binomial(p_{i,t}, X_{i,t})
 where the $p_{i,t}$ are calculated based on, say, a standard susceptible reconstruction. It would probably even be more accurate to say that $p_{i,t}\sim Beta(a,b)$ such that the mean of the beta distribution is equal to that of the estimated $p$ from the susceptible reconstruction, and the variance is equal to that of resulting from the fit.
 %some known disease-specific reporting fractions that are varying over time and $N_t$ is the total number of cases of any disease under consideration observed at time $t$. For example, we observe four under-reported serotype-specific case counts over time (the $Y_{i,t}$, or more succinctly, the $\bm{Y_t}$ and one total case count ($N_t$). Then, the $\bm{p_t}$ could be estimated by $p_{i,t} = \frac{Y_{i,t}}{N_t}$. 
 
-\section{A simple cross-protection model}
+\section{A two-strain cross-protection model}
 %Let's start with a similar but simpler version of the model presented above:
 %\begin{eqnarray}
 %\log {\mathbb E}[ X_{i,t}|X_{\cdot,t-1}, S_{i,t-1}] & = & \log\beta + \alpha_1 \log X_{t-1} + \alpha_2 \log S_{i,t-1}\\
@@ -94,7 +94,7 @@ I created a model that is similar to the theoretical four-strain model shown abo
 \item Assume only two strains.
 \item Assume $\beta$ is constant.
 \item Assume births are constant B.
-\item assume k is known and equals 2.
+\item Assume any infected individual has an exponentially distributed duration of cross-protection, with mean $\frac{1}{\lambda}$.
 \end{itemize}
 
 \begin{table}[htdp]
@@ -194,5 +194,119 @@ simulate(
         seed=677573454L
 ) -> tsir
 plot(tsir, variables=c("y1", "y2", "C1","C2", "I1","I2", "S1", "S2"))
+@
+
+\section{A four-strain cross-protection model}
+Now, adapting the two-strain toy model above to include four strains. Again:
+\begin{itemize}
+\item Assume $\beta$ is constant.
+\item Assume births are constant B.
+\item Assume any infected individual has an exponentially distributed duration of cross-protection, with mean $\frac{1}{\lambda}$.
+\end{itemize}
+
+\begin{table}[htdp]
+\caption{Toy model parameters}
+\begin{center}
+\begin{tabular}{ll}
+\bf parameter & \bf description \\ 
+\hline
+$\beta$ & contact rate \\ 
+$\lambda$ & 1/mean duration of cross-protection \\
+$\alpha_1$, $\alpha_2$ & mixing parameters \\ 
+$N$ & population size \\
+$\mu$ & birth rate \\ 
+$\iota$ & rate of imported infections \\ 
+\end{tabular}
+\end{center}
+\label{toyParams}
+\end{table}%
+
+
+Model parameters are shown in Table \ref{toyParams}. The model was initialized with a vector of three initial values for each strain (the $S$, $I$ and $CP$ compartments for each strain) and was simulated using the following framework:
+\begin{eqnarray}
+I_{i,t} & \sim & Poisson\left ( \beta \cdot (\frac{I_{i,t-1}}{N}+\iota)^{\alpha_1}\cdot S_{i,t-1}^{\alpha_2}\right ) \\
+NS_{i,t} & \sim & Poisson(\lambda \cdot CP_{i,t-1}) \\
+S_{i,t} & = & S_{i,t-1} + N\cdot\mu - \sum_{\forall j} I_{j,t} + NS_{1,t} \\ 
+CP_{i,t} & = & CP_{i,t-1} - NS_{i,t} + \sum_{j\neq i}I_{j,t} 
+\end{eqnarray}
+Note that the $NS$ quantity stands for ``newly susceptible'', i.e. these are the individuals who are heading out of the cross-protected state ($CP$) and back to being susceptible. The trick that we have used here is that by assuming the cross protection is exponentially distributed and by keeping track explicitly of $CP_{i,t}$ we can use the memoryless property of exponential survival to calculate how many individuals will leave the CP class only using the current count of inviduals in CP and $\lambda$. Currently am implementing this by drawing a Poisson with mean $\lambda\cdot CP_t$, but is this completely right? 
+
+<<fourStrainProcSim>>=
+fourStrainProcSim <- function(x, t, params, delta.t, ...) {
+        ## unpack the params vector:
+        beta <- params["beta"]
+        alpha1 <- params["alpha1"]
+        alpha2 <- params["alpha2"]
+        lambda <- params["lambda"]
+        mu <- params["mu"]
+        N <- params["N"]
+        iota <- params["iota"]
+        ## copy x for easy access
+        newx <- x
+        namesI <- c("I1", "I2", "I3", "I4")
+        namesS <- c("S1", "S2", "S3", "S4")
+        namesC <- c("C1", "C2", "C3", "C4")
+        ## transitions for each strain
+        newx[namesI] <- rpois(4, beta*((x[namesI]/N+iota)^alpha1)*(x[namesS]^alpha2))
+        ## Poisson approximation to exponential losses, those moving from CP back to S
+        NS <- rpois(4, lambda*x[namesC]) 
+        ## udpate counts
+        newx[namesS] <- x[namesS] + N*mu - newx[namesI] + NS
+        newx[namesC] <- x[namesC] - NS + newx[namesI]
+        return(newx[c(namesS, namesI, namesC)])
+}
+
+fourStrainMeasSim <- function(x, t, params, ...) {
+        namesR <- paste0("rho", 1:4)
+        namesI <- paste0("I", 1:4)
+        rhos <- params[namesR]
+        ys <- rbinom(4, size=x[namesI], prob=rhos)
+        unname(ys)
+}
+@
+
+And now we can simulate this framework
+<<simulateFourStrainTSIR, cache=TRUE>>=
+pomp(
+        data=data.frame(
+                time=seq(0, 5000,by=1),
+                y1=NA, y2=NA, y3=NA, y4=NA
+        ),
+        times="time",
+        t0=0,
+        rprocess=discrete.time.sim(
+                step.fun=fourStrainProcSim,
+                delta.t=1
+        ),
+        rmeasure=fourStrainMeasSim,
+        # initial condition parameters 
+        ic.pars=c(paste0("I", 1:4, ".0"),
+                  paste0("S", 1:4, ".0"),
+                  paste0("C", 1:4, ".0")
+        ),
+        # names of the compartments
+        comp.names=c(paste0("I", 1:4),
+                     paste0("S", 1:4),
+                     paste0("C", 1:4)
+        )
+) -> tsir
+
+simulate(
+        tsir,
+        params=c(
+                N=50000,
+                mu=1/500,
+                rho1=.5, rho2=.1, rho3=.1, rho4=.1,
+                beta=1.1,alpha1=1,alpha2=1,
+                iota=1/10000,
+                lambda=1/10000,
+                S1.0=4000,I1.0=100,C1.0=100,
+                S2.0=10000,I2.0=100,C2.0=100,
+                S3.0=400,I3.0=100,C3.0=100,
+                S4.0=40000,I4.0=100,C4.0=100
+        ),
+        seed=677573454L
+) -> tsir
+plot(tsir, variables=c("I1","I2", "I3", "I4"))
 @
 \end{document}
