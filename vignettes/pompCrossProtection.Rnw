@@ -224,17 +224,28 @@ $\iota$ & rate of imported infections \\
 
 Model parameters are shown in Table \ref{toyParams}. The model was initialized with a vector of three initial values for each strain (the $S$, $I$ and $CP$ compartments for each strain) and was simulated using the following framework:
 \begin{eqnarray}
-I_{i,t} & \sim & Poisson\left ( \beta \cdot (\frac{I_{i,t-1}}{N}+\iota)^{\alpha_1}\cdot S_{i,t-1}^{\alpha_2}\right ) \\
+I_{i,t} & \sim & Poisson\left ( (\beta(t) \frac{I_{i,t-1}}{N}+\iota)^{\alpha_1}\cdot S_{i,t-1}^{\alpha_2}\right ) \\
 NS_{i,t} & \sim & Poisson(\lambda \cdot CP_{i,t-1}) \\
 S_{i,t} & = & S_{i,t-1} + N\cdot\mu - \sum_{\forall j} I_{j,t} + NS_{1,t} \\ 
 CP_{i,t} & = & CP_{i,t-1} - NS_{i,t} + \sum_{j\neq i}I_{j,t} 
 \end{eqnarray}
 Note that the $NS$ quantity stands for ``newly susceptible'', i.e. these are the individuals who are heading out of the cross-protected state ($CP$) and back to being susceptible. The trick that we have used here is that by assuming the cross protection is exponentially distributed and by keeping track explicitly of $CP_{i,t}$ we can use the memoryless property of exponential survival to calculate how many individuals will leave the CP class only using the current count of inviduals in CP and $\lambda$. Currently am implementing this by drawing a Poisson with mean $\lambda\cdot CP_t$, but is this completely right? 
 
+Adding a seasonality b-spline basis function and plot the betas given a set of coefficients
+<<seasonalityTerms>>=
+tbasis <- seq(0, 100, by=1/26)
+basis <- periodic.bspline.basis(tbasis,nbasis=3,degree=2,period=1,names="b%d")
+basisCoefs <- c(1.5,-.1,1) ## chosen to give range between ~.2 and ~1.2
+betas <- basis %*% basisCoefs
+plot(betas[1:52], type="l")
+@
+
+
 <<fourStrainProcSim>>=
-fourStrainProcSim <- function(x, t, params, delta.t, ...) {
+fourStrainProcSim <- function(x, t, params, delta.t, covars, ...) {
         ## unpack the params vector:
-        beta <- params["beta"]
+        b <- params[c("b1", "b2", "b3")]
+        beta <- b %*% covars#params["beta"]
         alpha1 <- params["alpha1"]
         alpha2 <- params["alpha2"]
         lambda <- params["lambda"]
@@ -254,12 +265,12 @@ fourStrainProcSim <- function(x, t, params, delta.t, ...) {
         ## Poisson approximation to exponential losses, those moving from CP back to S
         NS <- rpois(4, lambda*x[namesC]) 
         ## udpate counts
-        newx[namesS] <- x[namesS] + N*mu - sum(newx[namesI]) + NS
+        newx[namesS] <- pmax(x[namesS] + N*mu - sum(newx[namesI]) + NS, 0)
         newx[namesC] <- x[namesC] - NS + NCP
         return(newx[c(namesS, namesI, namesC)])
 }
 
-fourStrainMeasSim <- function(x, t, params, ...) {
+fourStrainMeasSim <- function(x, t, params, covars, ...) {
         namesR <- paste0("rho", 1:4)
         namesI <- paste0("I", 1:4)
         rhos <- params[namesR]
@@ -269,17 +280,19 @@ fourStrainMeasSim <- function(x, t, params, ...) {
 @
 
 And now we can simulate this framework
-<<simulateFourStrainTSIR, cache=TRUE>>=
+<<simulateFourStrainTSIR>>=
 pomp(
         data=data.frame(
-                time=seq(0, 5000,by=1),
+                time=seq(0, 100,by=1/26),
                 y1=NA, y2=NA, y3=NA, y4=NA
         ),
         times="time",
+        tcovar=tbasis,
+        covar=basis,
         t0=0,
         rprocess=discrete.time.sim(
                 step.fun=fourStrainProcSim,
-                delta.t=1
+                delta.t=1/26
         ),
         rmeasure=fourStrainMeasSim,
         # initial condition parameters 
@@ -300,16 +313,21 @@ simulate(
                 N=50000,
                 mu=1/500,
                 rho1=.5, rho2=.1, rho3=.1, rho4=.1,
-                beta=1.1,alpha1=1,alpha2=1,
-                iota=1/10000,
-                lambda=1/500,
-                S1.0=4000,I1.0=100,C1.0=100,
+                b1=basisCoefs[1], 
+                b2=basisCoefs[2],  
+                b3=basisCoefs[3], 
+                #beta=1.1,
+                alpha1=1,alpha2=1,
+                iota=1/200000,
+                lambda=1/50,
+                S1.0=10000,I1.0=100,C1.0=100,
                 S2.0=10000,I2.0=100,C2.0=100,
-                S3.0=400,I3.0=100,C3.0=100,
-                S4.0=40000,I4.0=100,C4.0=100
+                S3.0=10000,I3.0=100,C3.0=100,
+                S4.0=10000,I4.0=100,C4.0=100
         ),
         seed=677573454L
 ) -> tsir
 plot(tsir, variables=c("I1","I2", "I3", "I4"))
+plot(tsir, variables=c("S1","S2", "S3", "S4"))
 @
 \end{document}
