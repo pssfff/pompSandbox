@@ -164,7 +164,7 @@ And now we can simulate this framework
 simulate(
         pomp(
                 data=data.frame(
-                        time=seq(0, 1000,by=1),
+                        time=seq(0, 5000,by=1),
                         y1=NA,
                         y2=NA
                 ),
@@ -183,13 +183,13 @@ simulate(
         ),
         params=c(
                 N=50000,
-                mu=1/50,
+                mu=1/500,
                 rho1=.5, rho2=.1,
-                beta=1.2,alpha1=1,alpha2=1,
-                iota=1/1000,
-                lambda=1/50,
-                S1.0=40000,I1.0=500,C1.0=100,
-                S2.0=40000,I2.0=2000,C2.0=100
+                beta=1.4,alpha1=1,alpha2=1,
+                iota=1/10000,
+                lambda=1/100,
+                S1.0=40000,I1.0=100,C1.0=100,
+                S2.0=40000,I2.0=100,C2.0=100
         ),
         seed=677573454L
 ) -> tsir
