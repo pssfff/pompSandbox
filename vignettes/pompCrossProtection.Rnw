@@ -248,11 +248,14 @@ fourStrainProcSim <- function(x, t, params, delta.t, ...) {
         namesC <- c("C1", "C2", "C3", "C4")
         ## transitions for each strain
         newx[namesI] <- rpois(4, beta*((x[namesI]/N+iota)^alpha1)*(x[namesS]^alpha2))
+        ## sums for newly cross-protecteds for each strain 
+        sumMatrix <- 1 - diag(4) ## for strain i, sum all but i 
+        NCP <- newx[namesI]%*%sumMatrix
         ## Poisson approximation to exponential losses, those moving from CP back to S
         NS <- rpois(4, lambda*x[namesC]) 
         ## udpate counts
-        newx[namesS] <- x[namesS] + N*mu - newx[namesI] + NS
-        newx[namesC] <- x[namesC] - NS + newx[namesI]
+        newx[namesS] <- x[namesS] + N*mu - sum(newx[namesI]) + NS
+        newx[namesC] <- x[namesC] - NS + NCP
         return(newx[c(namesS, namesI, namesC)])
 }
 
@@ -299,7 +302,7 @@ simulate(
                 rho1=.5, rho2=.1, rho3=.1, rho4=.1,
                 beta=1.1,alpha1=1,alpha2=1,
                 iota=1/10000,
-                lambda=1/10000,
+                lambda=1/500,
                 S1.0=4000,I1.0=100,C1.0=100,
                 S2.0=10000,I2.0=100,C2.0=100,
                 S3.0=400,I3.0=100,C3.0=100,
