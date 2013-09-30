@@ -240,7 +240,7 @@ betas <- basis %*% basisCoefs
 plot(betas[1:52], type="l")
 @
 
-
+The following functions define the simulator for the process model as well as the simulator for the measurement model: 
 <<fourStrainProcSim>>=
 fourStrainProcSim <- function(x, t, params, delta.t, covars, ...) {
         ## unpack the params vector:
@@ -279,7 +279,7 @@ fourStrainMeasSim <- function(x, t, params, covars, ...) {
 }
 @
 
-And now we can simulate this framework
+And now we can set up this pomp object for simulation with different parameter sets:
 <<simulateFourStrainTSIR>>=
 pomp(
         data=data.frame(
@@ -306,28 +306,106 @@ pomp(
                      paste0("C", 1:4)
         )
 ) -> tsir
+@
 
+The following simulation uses a set of parameters that generates a lot of zero observation values:
+<<simulationWithZeroes>>=
+paramsZeroes <- c(N=50000,
+                  mu=1/500,
+                  rho1=.5, rho2=.1, rho3=.1, rho4=.1,
+                  b1=basisCoefs[1], 
+                  b2=basisCoefs[2],  
+                  b3=basisCoefs[3], 
+                  #beta=1.1,
+                  alpha1=1,alpha2=1,
+                  iota=1/200000,
+                  lambda=1/50,
+                  S1.0=10000,I1.0=100,C1.0=100,
+                  S2.0=10000,I2.0=100,C2.0=100,
+                  S3.0=10000,I3.0=100,C3.0=100,
+                  S4.0=10000,I4.0=100,C4.0=100
+)
 simulate(
         tsir,
-        params=c(
-                N=50000,
-                mu=1/500,
+        params=paramsZeroes,
+        seed=677573454L
+) -> tsirZeroes
+plot(tsirZeroes, variables=c("I1","I2", "I3", "I4"))
+plot(tsirZeroes, variables=c("S1","S2", "S3", "S4"))
+@
+
+Parameters from this simulation were chosen so that there were not as many zeroes as in the last one.
+<<simulationFewerZeroes>>=
+basisCoefs <- c(1.1,.95,1) ## chosen to give range between ~.2 and ~1.2
+betas <- basis %*% basisCoefs
+plot(betas[1:52], type="l")
+paramsMore <- c(N=50000,
+                mu=1/50,
                 rho1=.5, rho2=.1, rho3=.1, rho4=.1,
                 b1=basisCoefs[1], 
                 b2=basisCoefs[2],  
                 b3=basisCoefs[3], 
-                #beta=1.1,
                 alpha1=1,alpha2=1,
-                iota=1/200000,
+                iota=1/700,
                 lambda=1/50,
-                S1.0=10000,I1.0=100,C1.0=100,
-                S2.0=10000,I2.0=100,C2.0=100,
-                S3.0=10000,I3.0=100,C3.0=100,
-                S4.0=10000,I4.0=100,C4.0=100
-        ),
+                S1.0=100000,I1.0=100,C1.0=100,
+                S2.0=100000,I2.0=100,C2.0=100,
+                S3.0=100000,I3.0=100,C3.0=100,
+                S4.0=100000,I4.0=100,C4.0=100
+)
+simulate(
+        tsir,
+        params=paramsMore,
         seed=677573454L
-) -> tsir
-plot(tsir, variables=c("I1","I2", "I3", "I4"))
-plot(tsir, variables=c("S1","S2", "S3", "S4"))
+) -> tsirMore
+plot(tsirMore, variables=c("I1","I2", "I3", "I4"))
+#plot(tsirMore, variables=c("S1","S2", "S3", "S4"))
+tsirMore <- window(tsirMore, start=30, end=100)
 @
+
+
+\subsection*{Measurement model}
+We define measurement model as a simple binomial process for each strain:
+\begin{equation}
+Y_{i,t} \sim {\text Binomial}(I_{i,t}, \rho_{i,t})
+\end{equation}
+where $Y_{i,t}$ is the number of reported cases for strain $i$ at time $t$ and $\rho_i$ is a strain-specific reporting rate. In the code implemented above, we assume $\rho_{i,t}$ is constant over time but it could be assumed to vary across time. 
+
+Here is the function that evaluates the measurement model pdf:
+<<measModelDens>>=
+fourStrainMeasDens <- function(y, x, t, params, covars, log, ...) {
+        namesR <- paste0("rho", 1:4)
+        namesI <- paste0("I", 1:4)
+        rhos <- params[namesR]
+        f <- dbinom(y, size=x[namesI], prob=rhos, log=log)
+        return(unname(prod(f)))
+}
+tsirMore <- pomp(
+             tsirMore,
+             dmeasure=fourStrainMeasDens
+             )
+@
+
+
+And now, we can define a parameter vector, and evaluate the likelihood of the simulated data from above at a particular parameter set:
+<<evalLik, include=FALSE>>=
+theta <- c(N=50000,
+           mu=1/500,
+           rho1=.5, rho2=.1, rho3=.1, rho4=.1,
+           b1=basisCoefs[1],
+           b2=basisCoefs[2],
+           b3=basisCoefs[3],
+           alpha1=1,alpha2=1,
+           iota=1/200000,
+           lambda=1/50,
+           S1.0=10000,I1.0=100,C1.0=100,
+           S2.0=10000,I2.0=100,C2.0=100,
+           S3.0=10000,I3.0=100,C3.0=100,
+           S4.0=10000,I4.0=100,C4.0=100)
+pf <- pfilter(tsirMore, params=theta, Np=1000, max.fail=50, tol=1e-4, 
+              save.states=TRUE, save.params=TRUE, verbose=TRUE)
+(loglik.truth <- logLik(pf))
+@
+Can't get the above code to not fail!
+
 \end{document}
