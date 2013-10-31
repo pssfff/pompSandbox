@@ -387,8 +387,40 @@ tsirMore <- pomp(
 @
 
 
+Before we go further, we should add in parameter transformations to see if that makes likelihood calculations, filtering, etc... more smooth.
+<<paramTransforms>>=
+tsirMore <- pomp(
+                tsirMore,
+                ## from estimation scale to natural scale
+                parameter.transform=function(params,...){
+                        exp.idx <- c("N", "mu", "iota", "lambda",
+                                     "S1.0", "I1.0", "C1.0",
+                                     "S2.0", "I2.0", "C2.0",
+                                     "S3.0", "I3.0", "C3.0",
+                                     "S4.0", "I4.0", "C4.0")
+                        params[exp.idx] <- exp(params[exp.idx])
+                        expit.idx <- paste0("rho", 1:4)
+                        params[expit.idx] <- exp(params[expit.idx])/(1+exp(params[expit.idx]))
+                        return(params)
+                },
+                ## from natural scale to estimation scale
+                parameter.inv.transform=function(params,...){
+                        log.idx <- c("N", "mu", "iota", "lambda",
+                                     "S1.0", "I1.0", "C1.0",
+                                     "S2.0", "I2.0", "C2.0",
+                                     "S3.0", "I3.0", "C3.0",
+                                     "S4.0", "I4.0", "C4.0")
+                        params[log.idx] <- log(params[log.idx])
+                        logit.idx <- paste0("rho", 1:4)
+                        params[logit.idx] <- log(params[logit.idx]/(1-params[logit.idx]))
+                        return(params)
+                }
+)
+@
+
+
 And now, we can define a parameter vector, and evaluate the likelihood of the simulated data from above at a particular parameter set:
-<<evalLik, include=FALSE>>=
+<<evalLik, include=FALSE, eval=FALSE>>=
 theta <- c(N=50000,
            mu=1/500,
            rho1=.5, rho2=.1, rho3=.1, rho4=.1,
@@ -407,5 +439,12 @@ pf <- pfilter(tsirMore, params=theta, Np=1000, max.fail=50, tol=1e-4,
 (loglik.truth <- logLik(pf))
 @
 Can't get the above code to not fail!
+
+
+\section{to dos}
+\begin{itemize}
+\item Try trajectory matching?
+\item For running a particle filter, is it possible to specify certain parameters that remain fixed across all particles?
+\end{itemize}
 
 \end{document}
