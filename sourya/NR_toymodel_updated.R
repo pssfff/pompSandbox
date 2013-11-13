@@ -165,76 +165,89 @@ tsirModel2 <- pomp(
 )
 
 
+## functions to plot residuals from pfilters
+plot.resids <- function(pf, standardize=FALSE) {
+        par(mfrow=c(2,2))
+        par(mar=c(4,4,1,1))
+        if(standardize){
+                resid1 <- (pf@data['y1',] - pred.mean(pf)['I1',]*pf@params['rho1'])/sqrt(pred.mean(pf)['I1',]*pf@params['rho1'])
+                resid2 <- (pf@data['y2',] - pred.mean(pf)['I2',]*pf@params['rho2'])/sqrt(pred.mean(pf)['I2',]*pf@params['rho2'])
+                resid3 <- (pf@data['y3',] - pred.mean(pf)['I3',]*pf@params['rho3'])/sqrt(pred.mean(pf)['I3',]*pf@params['rho3'])
+                resid4 <- (pf@data['y4',] - pred.mean(pf)['I4',]*pf@params['rho4'])/sqrt(pred.mean(pf)['I4',]*pf@params['rho4'])
+        } else {
+                resid1 <- pf@data['y1',] - pred.mean(pf)['I1',]*pf@params['rho1']
+                resid2 <- pf@data['y2',] - pred.mean(pf)['I2',]*pf@params['rho2']
+                resid3 <- pf@data['y3',] - pred.mean(pf)['I3',]*pf@params['rho3']
+                resid4 <- pf@data['y4',] - pred.mean(pf)['I4',]*pf@params['rho4']                
+        }
+        ylim <- range(resid1, resid2, resid3, resid4)
+        plot(resid1, type='o', col=2, ylab='y1', xlab='weeks', ylim=ylim)
+        plot(resid2, type='o', col=2, ylab='y2', xlab='weeks', ylim=ylim)
+        plot(resid3, type='o', col=2, ylab='y3', xlab='weeks', ylim=ylim)
+        plot(resid4,type='o', col=2, ylab='y4', xlab='weeks', ylim=ylim)
+        
+}
+
+plot.means <- function(pf) {
+        par(mfrow=c(2,2))
+        par(mar=c(4,4,1,1))
+        mean1 <- pred.mean(pf)['I1',]*pf@params['rho1']
+        mean2 <- pred.mean(pf)['I2',]*pf@params['rho2']
+        mean3 <- pred.mean(pf)['I3',]*pf@params['rho3']
+        mean4 <- pred.mean(pf)['I4',]*pf@params['rho4']                
+        
+        ylim <- range(mean1, mean2, mean3, mean4, pf@data[c("y1", "y2", "y3", "y4"),])
+        plot(mean1, type='o', col=2, ylab='y1', xlab='weeks', ylim=ylim)
+        lines(pf@data['y1',], type='l')
+        plot(mean2, type='o', col=2, ylab='y2', xlab='weeks', ylim=ylim)
+        lines(pf@data['y2',], type='l')
+        plot(mean3, type='o', col=2, ylab='y3', xlab='weeks', ylim=ylim)
+        lines(pf@data['y3',], type='l')
+        plot(mean4,type='o', col=2, ylab='y4', xlab='weeks', ylim=ylim)
+        lines(pf@data['y4',], type='l')
+}
+
 ## start with the truth       
 theta.truth <- paramsModel2     
             
 pf.truth <- pfilter(tsirModel2, params=theta.truth, 
-                    Np=2000, max.fail=261, tol=1e-15,
+                    Np=4000, max.fail=261, tol=1e-15,
                     pred.mean=TRUE, filter.mean=TRUE)
-
-## Comparing data with one step ahead predictions..
-pdf(file='predmean_truth.pdf')
-par(mfrow=c(2,2))
-par(mar=c(4,4,1,1))
-plot(pf.truth@data['y1',] - pred.mean(pf.truth)['I1',]*pf.truth@params['rho1'], type='o', col=2, ylab='y1', xlab='weeks')
-plot(pf.truth@data['y2',] - pred.mean(pf.truth)['I2',]*pf.truth@params['rho2'], type='o', col=2, ylab='y2', xlab='weeks')
-plot(pf.truth@data['y3',] - pred.mean(pf.truth)['I3',]*pf.truth@params['rho3'], type='o', col=2, ylab='y3', xlab='weeks')
-plot(pf.truth@data['y4',] - pred.mean(pf.truth)['I4',]*pf.truth@params['rho4'], type='o', col=2, ylab='y4', xlab='weeks')
-dev.off()
-
-par(mfrow=c(4,1))
-plot(pred.mean(pf.truth)['I1',]*pf.truth@params['rho1'], type='l', col=2, ylab='y1', xlab='weeks')
-lines(pf.truth@data['y1',], type='l')
-plot(pred.mean(pf.truth)['I2',]*pf.truth@params['rho2'], type='l', col=2, ylab='y2', xlab='weeks')
-lines(pf.truth@data['y2',], type='l')
-plot(pred.mean(pf.truth)['I3',]*pf.truth@params['rho3'], type='l', col=2, ylab='y3', xlab='weeks')
-lines(pf.truth@data['y3',], type='l')
-plot(pred.mean(pf.truth)['I4',]*pf.truth@params['rho4'], type='l', col=2, ylab='y4', xlab='weeks')
-lines(pf.truth@data['y4',], type='l')
-
-print(paste('The likelihood of truth is: ',logLik(pf.truth), sep=''))
 
 ## now a small lie (1% from the truth)
 theta.lie.small <- theta.truth
 theta.lie.small[-1] <-  theta.lie.small[-1] + theta.truth[-1]*.01
 
-pf.lie.small <- pfilter(tsirModel2, params=theta.lie.small, Np=2000, max.fail=261, tol=1e-15,
-               pred.mean=TRUE, filter.mean=TRUE)
-print(paste('The likelihood of a small lie is: ',logLik(pf.lie.small), sep=''))
-pdf(file='predmean_small_lie.pdf')
-par(mfrow=c(2,2))
-par(mar=c(4,4,1,1))
-plot(pf.lie.small@data['y1',] - pred.mean(pf.lie.small)['I1',]*pf.lie.small@params['rho1'], type='o', col=2, ylab='y1', xlab='weeks')
-plot(pf.lie.small@data['y2',] - pred.mean(pf.lie.small)['I2',]*pf.lie.small@params['rho2'], type='o', col=2, ylab='y2', xlab='weeks')
-plot(pf.lie.small@data['y3',] - pred.mean(pf.lie.small)['I3',]*pf.lie.small@params['rho3'], type='o', col=2, ylab='y3', xlab='weeks')
-plot(pf.lie.small@data['y4',] - pred.mean(pf.lie.small)['I4',]*pf.lie.small@params['rho4'], type='o', col=2, ylab='y4', xlab='weeks')
-dev.off()
-
-par(mfrow=c(1,1))
-plot(pred.mean(pf.lie.small)['I1',]*pf.lie.small@params['rho1'], type='l', col=2, ylab='y1', xlab='weeks')
-lines(pf.lie.small@data['y1',], type='l')
-plot(pred.mean(pf.lie.small)['I2',]*pf.lie.small@params['rho2'], type='l', col=2, ylab='y2', xlab='weeks')
-lines(pf.lie.small@data['y2',], type='l')
-plot(pred.mean(pf.lie.small)['I3',]*pf.lie.small@params['rho3'], type='l', col=2, ylab='y3', xlab='weeks')
-lines(pf.lie.small@data['y3',], type='l')
-plot(pred.mean(pf.lie.small)['I4',]*pf.lie.small@params['rho4'], type='l', col=2, ylab='y4', xlab='weeks')
-lines(pf.lie.small@data['y4',], type='l')
+pf.lie.small <- pfilter(tsirModel2, params=theta.lie.small, Np=4000, max.fail=261, tol=1e-15,
+                        pred.mean=TRUE, filter.mean=TRUE)
 
 ## now a big lie (10% from the truth)
 theta.lie.big <- theta.truth
 theta.lie.big[-1] <-  theta.lie.big[-1] + theta.truth[-1]*.1
 
-pf.lie.big <- pfilter(tsirModel2, params=theta.lie.big, Np=2000, max.fail=261, tol=1e-15,
-               pred.mean=TRUE, filter.mean=TRUE)
+pf.lie.big <- pfilter(tsirModel2, params=theta.lie.big, Np=4000, max.fail=261, tol=1e-15,
+                      pred.mean=TRUE, filter.mean=TRUE)
+
+## Comparing data with one step ahead predictions..
+plot.resids(pf.truth, standardize=TRUE)
+plot.resids(pf.truth, standardize=FALSE)
+plot.means(pf.truth)
+
+plot.resids(pf.lie.small, standardize=TRUE)
+plot.resids(pf.lie.small, standardize=FALSE)
+plot.means(pf.lie.small)
+
+plot.resids(pf.lie.big, standardize=TRUE) ## gives error?
+plot.resids(pf.lie.big, standardize=FALSE)
+plot.means(pf.lie.big)
+
+
+print(paste('The likelihood of truth is: ',logLik(pf.truth), sep=''))
+print(paste('The likelihood of a small lie is: ',logLik(pf.lie.small), sep=''))
 print(paste('The likelihood of a big lie is: ',logLik(pf.lie.big), sep=''))
 
-pdf(file='predmean_big_lie.pdf')
-par(mfrow=c(2,2))
-par(mar=c(4,4,1,1))
-plot(pf.lie.big@data['y1',] - pred.mean(pf.lie.big)['I1',]*pf.lie.big@params['rho1'], type='o', col=2, ylab='y1', xlab='weeks')
-plot(pf.lie.big@data['y2',] - pred.mean(pf.lie.big)['I2',]*pf.lie.big@params['rho2'], type='o', col=2, ylab='y2', xlab='weeks')
-plot(pf.lie.big@data['y3',] - pred.mean(pf.lie.big)['I3',]*pf.lie.big@params['rho3'], type='o', col=2, ylab='y3', xlab='weeks')
-plot(pf.lie.big@data['y4',] - pred.mean(pf.lie.big)['I4',]*pf.lie.big@params['rho4'], type='o', col=2, ylab='y4', xlab='weeks')
-dev.off()
+## reset initial conditions
+## rewrite process simulator in C 
+## use mif to create an estimate
 
 
