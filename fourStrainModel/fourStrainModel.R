@@ -96,7 +96,7 @@ paramsModel2 <- c(N=50000,
 
 ## simulate data from TSIR model and select just a subset of the data for fitting
 tsirModel2 <- simulate(
-        tsir,
+        tsirModel,
         params=paramsModel2,
         seed=677573454L
 ) 
@@ -114,7 +114,7 @@ theta.truth <- paramsModel2
 time0names <- c("S1.0", "I1.0", "C1.0", "S2.0", "I2.0", "C2.0", "S3.0", "I3.0", "C3.0", "S4.0", "I4.0", "C4.0")
 theta.truth[time0names] <- states(tsirModel2)[,index0]
 
-pf.truth <- pfilter(tsirModel2, params=theta.truth, 
+pf.truth <- pfilter(tsirModel2_Short, params=theta.truth, 
                     Np=4000, max.fail=261, tol=1e-15,
                     pred.mean=TRUE, filter.mean=TRUE)
 
@@ -122,14 +122,14 @@ pf.truth <- pfilter(tsirModel2, params=theta.truth,
 theta.lie.small <- theta.truth
 theta.lie.small[-1] <-  theta.lie.small[-1] + theta.truth[-1]*.01
 
-pf.lie.small <- pfilter(tsirModel2, params=theta.lie.small, Np=4000, max.fail=261, tol=1e-15,
+pf.lie.small <- pfilter(tsirModel2_Short, params=theta.lie.small, Np=4000, max.fail=261, tol=1e-15,
                         pred.mean=TRUE, filter.mean=TRUE)
 
 ## now a big lie (10% from the truth)
 theta.lie.big <- theta.truth
 theta.lie.big[-1] <-  theta.lie.big[-1] + theta.truth[-1]*.1
 
-pf.lie.big <- pfilter(tsirModel2, params=theta.lie.big, Np=4000, max.fail=261, tol=1e-15,
+pf.lie.big <- pfilter(tsirModel2_Short, params=theta.lie.big, Np=4000, max.fail=261, tol=1e-15,
                       pred.mean=TRUE, filter.mean=TRUE)
 
 ## Comparing data with one step ahead predictions..
