@@ -1,8 +1,8 @@
 // -*- C++ -*-
 
-#include <R.h> // From pomp template
-#include <Rmath.h> // From pomp template
-#include <Rdefines.h> // From pomp template
+//#include <R.h> // From pomp template
+//#include <Rmath.h> // From pomp template
+//#include <Rdefines.h> // From pomp template
 #include <Rcpp.h> // From Rcpp template
 using namespace Rcpp;
 
