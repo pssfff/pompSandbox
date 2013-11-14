@@ -1,12 +1,13 @@
 // -*- C++ -*-
 
-//#include <R.h> // From pomp template
-//#include <Rmath.h> // From pomp template
-//#include <Rdefines.h> // From pomp template
+// according to http://www.lindonslog.com/programming/r/rcpp/, the following
+// two includes are unnecessary when using Rcpp.h
+// #include <Rdefines.h> // From pomp template
+// #include <R.h> // From pomp template
+
+#include <Rmath.h> // From pomp template
 #include <Rcpp.h> // From Rcpp template
 using namespace Rcpp;
-
-
 
 /*** R
 
