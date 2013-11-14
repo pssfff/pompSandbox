@@ -132,6 +132,9 @@ theta.lie.big[-1] <-  theta.lie.big[-1] + theta.truth[-1]*.1
 pf.lie.big <- pfilter(tsirModel2_Short, params=theta.lie.big, Np=4000, max.fail=261, tol=1e-15,
                       pred.mean=TRUE, filter.mean=TRUE)
 
+save.image("pfiltersWithInitialConditions.rda")
+
+
 ## Comparing data with one step ahead predictions..
 plot.resids(pf.truth, standardize=TRUE)
 plot.resids(pf.truth, standardize=FALSE)
@@ -141,16 +144,15 @@ plot.resids(pf.lie.small, standardize=TRUE)
 plot.resids(pf.lie.small, standardize=FALSE)
 plot.means(pf.lie.small)
 
-plot.resids(pf.lie.big, standardize=TRUE) ## gives error?
-plot.resids(pf.lie.big, standardize=FALSE)
-plot.means(pf.lie.big)
+#plot.resids(pf.lie.big, standardize=TRUE) ## gives error?
+#plot.resids(pf.lie.big, standardize=FALSE)
+#plot.means(pf.lie.big)
 
 
 print(paste('The likelihood of truth is: ',logLik(pf.truth), sep=''))
 print(paste('The likelihood of a small lie is: ',logLik(pf.lie.small), sep=''))
 print(paste('The likelihood of a big lie is: ',logLik(pf.lie.big), sep=''))
 
-save.image("pfiltersWithInitialConditions.rda")
 ## rewrite process simulator in C 
 ## use mif to create an estimate
 
