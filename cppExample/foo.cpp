@@ -7,7 +7,7 @@ using namespace Rcpp;
 
 // For more on using Rcpp click the Help button on the editor toolbar
 
-//#define p (__k)
+#define p (k)
 
 
 // [[Rcpp::export]]
