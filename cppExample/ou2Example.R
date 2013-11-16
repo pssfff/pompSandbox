@@ -4,7 +4,6 @@ require(Rcpp)
 data(ou2)
 ou2.dat <- as.data.frame(ou2)
 
-## source() isn't the right call here
 sourceCpp("ou2Example.cpp")
 
 
