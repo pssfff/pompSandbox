@@ -33,3 +33,4 @@ simdat.Rplug <- simulate(ou2.Rplug,
                          nsim=1000)
 toc <- Sys.time()
 (etime.Rplug <- toc-tic)
+
