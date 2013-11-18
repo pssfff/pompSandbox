@@ -33,3 +33,22 @@ simdat.Rplug <- simulate(ou2.Rplug,
 toc <- Sys.time()
 (etime.Rplug <- toc-tic)
 
+#######################################
+## Example for non-vectorized C code ##
+#######################################
+ou2.Cplug <- pomp(
+        ou2.Rplug,
+        rprocess=discrete.time.sim("ou2_step"),
+        paramnames=c(
+                "alpha.1","alpha.2","alpha.3","alpha.4",
+                "sigma.1","sigma.2","sigma.3",
+                "tau"
+        ),
+        statenames=c("x1","x2"),
+        obsnames=c("y1","y2")
+)
+
+tic <- Sys.time()
+simdat.Cplug <- simulate(ou2.Cplug,params=theta,states=T,nsim=100000)
+toc <- Sys.time()
+(etime.Cplug <- toc-tic)
