@@ -69,6 +69,14 @@ toy.meas.sim <- function(x, t, params, ...) {
         unname(c(cases1, cases2))
 }
 
+toy.dmeas <- function(y, x, t, params, covars, log, ...) {
+        namesR <- paste0("rho", 1:2)
+        namesI <- paste0("I", 1:2)
+        rhos <- params[namesR]
+        f <- dbinom(y, size=x[namesI], prob=rhos, log=log)
+        return(unname(prod(f)))
+}
+
 ## measure functions for C
 rmeas <- "
         cases1 = rbinom(I1, rho1);
@@ -165,6 +173,7 @@ tsirR <- pomp(
         parameter.transform = partransR,
         parameter.inv.transform = paruntransR,
         rmeasure=toy.meas.sim,
+        dmeasure=toy.dmeas,
         # initial condition parameters 
         ic.pars=c("S1.0","I1.0","C1.0", 
                   "S2.0","I2.0","C2.0"), 
@@ -267,7 +276,7 @@ toc <- Sys.time()
 (tictoc.pfC <- toc-tic)
 print(round(logLik(pfC),1))
 
-## in C
+## in R
 tsirR_short <- window(tsirR, start=4500, end=5000)
 tic <- Sys.time()
 pfR <- pfilter(tsirR_short, Np=100, max.fail=length(tsirC_short@times)+1)
