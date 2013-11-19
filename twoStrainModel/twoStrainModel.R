@@ -41,6 +41,7 @@ toy.proc.sim <- function(x, t, params, delta.t, ...) {
 ## SIR process model with extra-demographic stochasticity
 step.fn <- '
 return;
+
 '
 skel <- '
 return;
