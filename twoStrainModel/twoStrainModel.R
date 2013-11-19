@@ -4,28 +4,12 @@
 
 
 require(pomp)
-proc.sim <- function(x, t, params, delta.t, ...) {
-        ## unpack the params vector:
-        ##  biweek
-        biweek <- params["biweek"]
-        beta.string <- paste0("beta", biweek)
-        ## beta1, ...., beta26
-        beta_t <- params[beta.string]
-        ## alpha1 and alpha2
-        alpha1 <- params["alpha1"]
-        alpha2 <- params["alpha2"]
-        ## CP params: delta and k
-        delta <- params["delta"]
-        k <- params["k"]
-        ## state at time t:
-        X <- x["X"]
-        ## compute the state at time t+delta.t
-        log.lambda <- beta*log(X) + alpha
-        xnew <- c(X=unname( rpois(n=1, lambda=exp(log.lambda)) ))
-        return(xnew)
-}
 
+####################
+## step functions ##
+####################
 
+## step function in R
 
 toy.proc.sim <- function(x, t, params, delta.t, ...) {
         ## unpack the params vector:
@@ -52,36 +36,64 @@ toy.proc.sim <- function(x, t, params, delta.t, ...) {
         return(newx[c("S1", "I1", "C1", "S2", "I2", "C2")])
 }
 
+#######################
+## measure functions ##
+#######################
+
+## measure function in R
 toy.meas.sim <- function(x, t, params, ...) {
         rho1 <- params["rho1"]
         rho2 <- params["rho2"]
-        y1 <- rbinom(1, size=x["I1"], prob=rho1)
-        y2 <- rbinom(1, size=x["I2"], prob=rho2)
-        unname(c(y1, y2))
+        cases1 <- rbinom(1, size=x["I1"], prob=rho1)
+        cases2 <- rbinom(1, size=x["I2"], prob=rho2)
+        unname(c(cases1, cases2))
 }
 
+## measure functions for C
+rmeas <- "
+        cases1 = rbinom(I1, rho1);
+        cases2 = rbinom(I2, rho2);
+"
+
+dmeas <- "
+        lik1 = dbinom(cases1, I1, rho1, give_log);
+        lik2 = dbinom(cases2, I2, rho2, give_log);
+        lik = lik1*lik2;
+"
+
+###############################
+## parameter transformations ##
+###############################
 
 
-simulate(
-        pomp(
-                data=data.frame(
-                        time=seq(0, 5000,by=1),
-                        y1=NA,
-                        y2=NA
-                ),
-                times="time",
-                t0=0,
-                rprocess=discrete.time.sim(
-                        step.fun=toy.proc.sim,
-                        delta.t=1
-                ),
-                rmeasure=toy.meas.sim,
-                # initial condition parameters 
-                ic.pars=c("S1.0","I1.0","C1.0", 
-                          "S2.0","I2.0","C2.0"), 
-                # names of the compartments
-                comp.names=c("S1","I1","C1", "S2","I2","C2") 
+tsir <- pomp(
+        data=data.frame(
+                time=seq(0, 5000,by=1),
+                cases1=NA,
+                cases2=NA
         ),
+        times="time",
+        t0=0,
+        rprocess=discrete.time.sim(
+                step.fun=toy.proc.sim,
+                delta.t=1
+        ),
+        rmeasure=toy.meas.sim,
+        # initial condition parameters 
+        ic.pars=c("S1.0","I1.0","C1.0", 
+                  "S2.0","I2.0","C2.0"), 
+        # names of the compartments
+        comp.names=c("S1","I1","C1", "S2","I2","C2"),
+        # names of the parameters
+        paramnames=c("N", "mu", "rho1", "rho2", 
+                     "beta", "alpha1", "alpha2",
+                     "iota", "lambda", 
+                     "S1.0", "I1.0", "C1.0",
+                     "S2.0", "I2.0", "C2.0"),
+        statenames=c("S1","I1","C1", "S2","I2","C2")
+)
+
+simulate(tsir, 
         params=c(
                 N=50000,
                 mu=1/500,
@@ -94,4 +106,4 @@ simulate(
         ),
         seed=677573454L
 ) -> tsir
-plot(tsir, variables=c("y1", "y2", "C1","C2", "I1","I2", "S1", "S2"))
+plot(tsir, variables=c("cases1", "cases2", "C1","C2", "I1","I2", "S1", "S2"))
