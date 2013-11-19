@@ -192,7 +192,7 @@ pompBuilder(
         dmeasure=dmeas,
         rmeasure=rmeas,
         step.fn=step.fn,
-        step.fn.delta.t=1,
+        step.fn.delta.t=1, ## not really treating this as a continuous system
         skeleton.type="vectorfield",
         skeleton=skel,
         tcovar="time",
@@ -254,5 +254,27 @@ toc <- Sys.time()
 plot(tsirC, variables=c("cases1", "cases2", "C1","C2", "I1","I2", "S1", "S2"))
 
 (as.numeric(tictoc1)/as.numeric(tictoc2))
+
+###########################
+## run a particle filter ##
+###########################
+
+## in C
+tsirC_short <- window(tsirC, start=4500, end=5000)
+tic <- Sys.time()
+pfC <- pfilter(tsirC_short, Np=100, max.fail=length(tsirC_short@times)+1)
+toc <- Sys.time()
+(tictoc.pfC <- toc-tic)
+print(round(logLik(pfC),1))
+
+## in C
+tsirR_short <- window(tsirR, start=4500, end=5000)
+tic <- Sys.time()
+pfR <- pfilter(tsirR_short, Np=100, max.fail=length(tsirC_short@times)+1)
+toc <- Sys.time()
+(tictoc.pfR <- toc-tic)
+print(round(logLik(pfR),1))
+
+(as.numeric(tictoc.pfR)/as.numeric(tictoc.pfC))
 
 
