@@ -115,7 +115,17 @@ void TSIR_dmeasure (double *__lik, double *__y, double *__x, double *__p, int gi
 void TSIR_stepfn (double *__x, const double *__p, const int *__stateindex, const int *__parindex, const int *__covindex, int __covdim, const double *__covars, double t, double dt)
 {
 
-return;
+        // new infections
+        I1 = rpois(beta1*pow(I1/N+iota, alpha1)*pow(S1, alpha2));
+        I2 = rpois(beta1*pow(I2/N+iota, alpha1)*pow(S2, alpha2));
+        // Poisson approximation to exponential losses
+        int C1_loss = rpois(lambda*C1);
+        int C2_loss = rpois(lambda*C2);
+        // udpate counts
+        S1 += N*mu - I1 - I2 + C1_loss;
+        S2 += N*mu - I2 - I1 + C2_loss;
+        C1 += I2 - C1_loss;
+        C2 += I1 - C2_loss;
  
 }
 

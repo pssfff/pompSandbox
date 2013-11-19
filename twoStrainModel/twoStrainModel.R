@@ -40,8 +40,17 @@ toy.proc.sim <- function(x, t, params, delta.t, ...) {
 ## skeleton functions in C
 ## SIR process model with extra-demographic stochasticity
 step.fn <- '
-return;
-
+        // new infections
+        I1 = rpois(beta1*pow(I1/N+iota, alpha1)*pow(S1, alpha2));
+        I2 = rpois(beta1*pow(I2/N+iota, alpha1)*pow(S2, alpha2));
+        // Poisson approximation to exponential losses
+        int C1_loss = rpois(lambda*C1);
+        int C2_loss = rpois(lambda*C2);
+        // udpate counts
+        S1 += N*mu - I1 - I2 + C1_loss;
+        S2 += N*mu - I2 - I1 + C2_loss;
+        C1 += I2 - C1_loss;
+        C2 += I1 - C2_loss;
 '
 skel <- '
 return;
@@ -207,6 +216,7 @@ pompBuilder(
 #####################
 
 ## in R
+tic <- Sys.time()
 simulate(tsirR, 
         params=c(
                 N=50000,
@@ -220,9 +230,12 @@ simulate(tsirR,
         ),
         seed=677573454L
 ) -> tsirR
+toc <- Sys.time()
+(tictoc1 <- toc-tic)
 plot(tsirR, variables=c("cases1", "cases2", "C1","C2", "I1","I2", "S1", "S2"))
 
 ## in C
+tic <- Sys.time()
 simulate(tsirC, 
          params=c(
                  N=50000,
@@ -236,5 +249,10 @@ simulate(tsirC,
          ),
          seed=677573454L
 ) -> tsirC
+toc <- Sys.time()
+(tictoc2 <- toc-tic)
 plot(tsirC, variables=c("cases1", "cases2", "C1","C2", "I1","I2", "S1", "S2"))
+
+(as.numeric(tictoc1)/as.numeric(tictoc2))
+
 
