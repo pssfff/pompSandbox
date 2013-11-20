@@ -30,6 +30,52 @@ fourStrainProcSim <- function(x, t, params, delta.t, covars, ...) {
         return(newx[c(namesS, namesI, namesC)])
 }
 
+## skeleton functions in C
+step.fn <- '
+        // define beta, the transmission rate
+        double beta;        		
+        beta = b1*seas1+b2*seas2+b3*seas3;
+
+        // new infections
+        I1 = rpois(beta*pow(I1/N+iota, alpha1)*pow(S1, alpha2));
+        I2 = rpois(beta*pow(I2/N+iota, alpha1)*pow(S2, alpha2));
+        I3 = rpois(beta*pow(I3/N+iota, alpha1)*pow(S3, alpha2));
+        I4 = rpois(beta*pow(I4/N+iota, alpha1)*pow(S4, alpha2));
+
+        // Poisson approximation to exponential losses, transitions from CP to S
+        int C1_loss = rpois(lambda*C1);
+        int C2_loss = rpois(lambda*C2);
+        int C3_loss = rpois(lambda*C3);
+        int C4_loss = rpois(lambda*C4);
+
+        // counts of newly cross-protected for each strain
+        int C1_add = I2 + I3 + I4;
+        int C2_add = I1 + I3 + I4;
+        int C3_add = I1 + I2 + I4;
+        int C4_add = I1 + I2 + I3;
+
+        // udpate susceptible counts
+        int allI = I1 + I2 + I3 + I4;
+        S1 += N*mu - allI + C1_loss;
+        if ( S1 <=0 ) S1 = 0;
+        S2 += N*mu - allI + C2_loss;
+        if ( S2 <=0 ) S2 = 0;
+        S3 += N*mu - allI + C3_loss;
+        if ( S3 <=0 ) S3 = 0;
+        S4 += N*mu - allI + C4_loss;
+        if ( S4 <=0 ) S4 = 0;
+
+        // update cross-protected counts 
+        C1 += C1_add - C1_loss;
+        C2 += C2_add - C2_loss;
+        C3 += C3_add - C3_loss;
+        C4 += C4_add - C4_loss;
+'
+skel <- '
+return;
+'
+
+
 #######################
 ## measure functions ##
 #######################
@@ -107,7 +153,6 @@ paruntransR  <- function(params,...){
 partrans <- "
         TN = exp(N);
         Tmu = exp(mu);
-        Tbeta1 = exp(beta1);
         Talpha1 = exp(alpha1);
         Talpha2 = exp(alpha2);
         Tiota = exp(iota);
@@ -137,7 +182,6 @@ partrans <- "
 paruntrans <- "
         TN = log(N);
         Tmu = log(mu);
-        Tbeta1 = log(beta1);
         Talpha1 = log(alpha1);
         Talpha2 = log(alpha2);
         Tiota = log(iota);
@@ -174,21 +218,21 @@ plot.resids <- function(pf, standardize=FALSE) {
         par(mfrow=c(2,2))
         par(mar=c(4,4,1,1))
         if(standardize){
-                resid1 <- (pf@data['y1',] - pred.mean(pf)['I1',]*pf@params['rho1'])/sqrt(pred.mean(pf)['I1',]*pf@params['rho1'])
-                resid2 <- (pf@data['y2',] - pred.mean(pf)['I2',]*pf@params['rho2'])/sqrt(pred.mean(pf)['I2',]*pf@params['rho2'])
-                resid3 <- (pf@data['y3',] - pred.mean(pf)['I3',]*pf@params['rho3'])/sqrt(pred.mean(pf)['I3',]*pf@params['rho3'])
-                resid4 <- (pf@data['y4',] - pred.mean(pf)['I4',]*pf@params['rho4'])/sqrt(pred.mean(pf)['I4',]*pf@params['rho4'])
+                resid1 <- (pf@data['cases1',] - pred.mean(pf)['I1',]*pf@params['rho1'])/sqrt(pred.mean(pf)['I1',]*pf@params['rho1'])
+                resid2 <- (pf@data['cases2',] - pred.mean(pf)['I2',]*pf@params['rho2'])/sqrt(pred.mean(pf)['I2',]*pf@params['rho2'])
+                resid3 <- (pf@data['cases3',] - pred.mean(pf)['I3',]*pf@params['rho3'])/sqrt(pred.mean(pf)['I3',]*pf@params['rho3'])
+                resid4 <- (pf@data['cases4',] - pred.mean(pf)['I4',]*pf@params['rho4'])/sqrt(pred.mean(pf)['I4',]*pf@params['rho4'])
         } else {
-                resid1 <- pf@data['y1',] - pred.mean(pf)['I1',]*pf@params['rho1']
-                resid2 <- pf@data['y2',] - pred.mean(pf)['I2',]*pf@params['rho2']
-                resid3 <- pf@data['y3',] - pred.mean(pf)['I3',]*pf@params['rho3']
-                resid4 <- pf@data['y4',] - pred.mean(pf)['I4',]*pf@params['rho4']                
+                resid1 <- pf@data['cases1',] - pred.mean(pf)['I1',]*pf@params['rho1']
+                resid2 <- pf@data['cases2',] - pred.mean(pf)['I2',]*pf@params['rho2']
+                resid3 <- pf@data['cases3',] - pred.mean(pf)['I3',]*pf@params['rho3']
+                resid4 <- pf@data['cases4',] - pred.mean(pf)['I4',]*pf@params['rho4']                
         }
         ylim <- range(resid1, resid2, resid3, resid4)
-        plot(resid1, type='o', col=2, ylab='y1', xlab='weeks', ylim=ylim)
-        plot(resid2, type='o', col=2, ylab='y2', xlab='weeks', ylim=ylim)
-        plot(resid3, type='o', col=2, ylab='y3', xlab='weeks', ylim=ylim)
-        plot(resid4,type='o', col=2, ylab='y4', xlab='weeks', ylim=ylim)
+        plot(resid1, type='o', col=2, ylab='cases1', xlab='weeks', ylim=ylim)
+        plot(resid2, type='o', col=2, ylab='cases2', xlab='weeks', ylim=ylim)
+        plot(resid3, type='o', col=2, ylab='cases3', xlab='weeks', ylim=ylim)
+        plot(resid4,type='o', col=2, ylab='cases4', xlab='weeks', ylim=ylim)
         
 }
 
@@ -200,13 +244,13 @@ plot.means <- function(pf) {
         mean3 <- pred.mean(pf)['I3',]*pf@params['rho3']
         mean4 <- pred.mean(pf)['I4',]*pf@params['rho4']                
         
-        ylim <- range(mean1, mean2, mean3, mean4, pf@data[c("y1", "y2", "y3", "y4"),])
+        ylim <- range(mean1, mean2, mean3, mean4, pf@data[c("cases1", "cases2", "cases3", "cases4"),])
         plot(mean1, type='o', col=2, ylab='y1', xlab='weeks', ylim=ylim)
-        lines(pf@data['y1',], type='l')
+        lines(pf@data['cases1',], type='l')
         plot(mean2, type='o', col=2, ylab='y2', xlab='weeks', ylim=ylim)
-        lines(pf@data['y2',], type='l')
+        lines(pf@data['cases2',], type='l')
         plot(mean3, type='o', col=2, ylab='y3', xlab='weeks', ylim=ylim)
-        lines(pf@data['y3',], type='l')
+        lines(pf@data['cases3',], type='l')
         plot(mean4,type='o', col=2, ylab='y4', xlab='weeks', ylim=ylim)
-        lines(pf@data['y4',], type='l')
+        lines(pf@data['cases4',], type='l')
 }

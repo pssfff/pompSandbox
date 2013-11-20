@@ -12,17 +12,17 @@ source("fourStrainFuncs.R")
 
 ## make spline basis
 tbasis <- seq(0, 100, by=1/26)
-basis <- periodic.bspline.basis(tbasis,nbasis=3,degree=2,period=1,names="b%d")
-basisCoefs <- c(1.5,-.1,1) ## chosen to give range between ~.2 and ~1.2
-betas <- basis %*% basisCoefs
-#plot(betas[1:52], type="l")
+basis <- periodic.bspline.basis(tbasis,nbasis=3,degree=2,period=1,names="seas%d")
 
-
+## define state names for easy assignment
+statenames <- c(paste0("I", 1:4), paste0("S", 1:4), paste0("C", 1:4))
+ic.names <- paste0(statenames, ".0")
+                
 ## create the TSIR pomp object 
 tsirModel <- pomp(
         data=data.frame(
                 time=seq(0, 100,by=1/26),
-                y1=NA, y2=NA, y3=NA, y4=NA
+                cases1=NA, cases2=NA, cases3=NA, cases4=NA
         ),
         times="time",
         tcovar=tbasis,
@@ -34,22 +34,53 @@ tsirModel <- pomp(
         ),
         rmeasure=fourStrainMeasSim,
         dmeasure=fourStrainMeasDens,
-        # initial condition parameters 
-        ic.pars=c(paste0("I", 1:4, ".0"),
-                  paste0("S", 1:4, ".0"),
-                  paste0("C", 1:4, ".0")
-        ),
-        # names of the compartments
-        comp.names=c(paste0("I", 1:4),
-                     paste0("S", 1:4),
-                     paste0("C", 1:4)
-        ),
         ## from estimation scale to natural scale
         parameter.transform=partransR,
         ## from natural scale to estimation scale
-        parameter.inv.transform=paruntransR
+        parameter.inv.transform=paruntransR,
+        paramnames=c("N", "mu", "rho1", "rho2", 
+                     "b1", "b2", "b3", 
+                     "alpha1", "alpha2",
+                     "iota", "lambda",
+                     ic.names),
+        # initial condition parameters 
+        ic.pars=ic.names,
+        # names of the compartments
+        comp.names=statenames,
+        statenames=statenames
 ) 
 
+## in C
+pompBuilder(
+        name="TSIR",
+        data=data.frame(
+                time=seq(0, 5000,by=1),
+                cases1=NA,
+                cases2=NA
+        ),
+        times="time",
+        t0=0,
+        dmeasure=dmeas,
+        rmeasure=rmeas,
+        step.fn=step.fn,
+        step.fn.delta.t=1, ## not really treating this as a continuous system
+        skeleton.type="vectorfield",
+        skeleton=skel,
+        tcovar="time",
+        parameter.transform=partrans,
+        parameter.inv.transform=paruntrans,
+        ic.pars=c("S1.0","I1.0","C1.0", 
+                  "S2.0","I2.0","C2.0"), 
+        # names of the compartments
+        comp.names=c("S1","I1","C1", "S2","I2","C2"),
+        # names of the parameters
+        paramnames=c("N", "mu", "rho1", "rho2", 
+                     "beta1", "alpha1", "alpha2",
+                     "iota", "lambda", 
+                     "S1.0", "I1.0", "C1.0",
+                     "S2.0", "I2.0", "C2.0"),
+        statenames=c("S1","I1","C1", "S2","I2","C2")
+) -> tsirC
 
 ##########################################
 ## refining basic TSIR model --> model2 ##
@@ -57,7 +88,7 @@ tsirModel <- pomp(
 
 ## first, modify the seasonal basis
 ## chosen to give range between ~.2 and ~1.2
-basisCoefs <- c(1.1,.95,1) 
+basisCoefs <- c(1.1,.95,1) # basisCoefs <- c(1.5,-.1,1) 
 betas <- basis %*% basisCoefs
 #plot(betas[1:52], type="l")
 
