@@ -1,5 +1,5 @@
 ############################
-## create base TSIR model ##
+## proc sim functions     ##
 ############################
 
 fourStrainProcSim <- function(x, t, params, delta.t, covars, ...) {
@@ -30,6 +30,10 @@ fourStrainProcSim <- function(x, t, params, delta.t, covars, ...) {
         return(newx[c(namesS, namesI, namesC)])
 }
 
+#######################
+## measure functions ##
+#######################
+
 fourStrainMeasSim <- function(x, t, params, covars, ...) {
         namesR <- paste0("rho", 1:4)
         namesI <- paste0("I", 1:4)
@@ -51,6 +55,119 @@ fourStrainMeasDens <- function(y, x, t, params, covars, log, ...) {
         return(unname(prod(f)))
 }
 
+## measure functions for C
+rmeas <- "
+        cases1 = rbinom(I1, rho1);
+        cases2 = rbinom(I2, rho2);
+        cases3 = rbinom(I3, rho3);
+        cases4 = rbinom(I4, rho4);
+"
+
+dmeas <- "
+        double lik1 = dbinom(cases1, I1, rho1, give_log);
+        double lik2 = dbinom(cases2, I2, rho2, give_log);
+        double lik3 = dbinom(cases3, I3, rho3, give_log);
+        double lik4 = dbinom(cases4, I4, rho4, give_log);
+        double tol = 10E-15;
+        lik = lik1*lik2*lik3*lik4;
+        // need to add tolerance here?
+"
+
+
+###############################
+## parameter transformations ##
+###############################
+
+## in R
+partransR <- function(params,...){
+        exp.idx <- c("N", "mu", "iota", "lambda",
+                     "S1.0", "I1.0", "C1.0",
+                     "S2.0", "I2.0", "C2.0",
+                     "S3.0", "I3.0", "C3.0",
+                     "S4.0", "I4.0", "C4.0")
+        params[exp.idx] <- exp(params[exp.idx])
+        expit.idx <- paste0("rho", 1:4)
+        params[expit.idx] <- exp(params[expit.idx])/(1+exp(params[expit.idx]))
+        return(params)
+}
+
+paruntransR  <- function(params,...){
+        log.idx <- c("N", "mu", "iota", "lambda",
+                     "S1.0", "I1.0", "C1.0",
+                     "S2.0", "I2.0", "C2.0",
+                     "S3.0", "I3.0", "C3.0",
+                     "S4.0", "I4.0", "C4.0")
+        params[log.idx] <- log(params[log.idx])
+        logit.idx <- paste0("rho", 1:4)
+        params[logit.idx] <- log(params[logit.idx]/(1-params[logit.idx]))
+        return(params)
+}
+
+## in C
+partrans <- "
+        TN = exp(N);
+        Tmu = exp(mu);
+        Tbeta1 = exp(beta1);
+        Talpha1 = exp(alpha1);
+        Talpha2 = exp(alpha2);
+        Tiota = exp(iota);
+        Tlambda = exp(lambda);
+        // rhos        
+        Trho1 = expit(rho1);
+        Trho2 = expit(rho2);
+        Trho3 = expit(rho3);
+        Trho4 = expit(rho4);
+        // strain 1
+        TS1_0 = exp(S1_0);
+        TI1_0 = exp(I1_0);
+        TC1_0 = exp(C1_0);
+        // strain 2
+        TS2_0 = exp(S2_0);
+        TI2_0 = exp(I2_0);
+        TC2_0 = exp(C2_0);
+        // strain 3
+        TS3_0 = exp(S3_0);
+        TI3_0 = exp(I3_0);
+        TC3_0 = exp(C3_0);
+        // strain 4
+        TS4_0 = exp(S4_0);
+        TI4_0 = exp(I4_0);
+        TC4_0 = exp(C4_0);
+"
+paruntrans <- "
+        TN = log(N);
+        Tmu = log(mu);
+        Tbeta1 = log(beta1);
+        Talpha1 = log(alpha1);
+        Talpha2 = log(alpha2);
+        Tiota = log(iota);
+        Tlambda = log(lambda);
+        // rhos        
+        Trho1 = logit(rho1);
+        Trho2 = logit(rho2);
+        Trho3 = logit(rho3);
+        Trho4 = logit(rho4);
+        // strain 1
+        TS1_0 = log(S1_0);
+        TI1_0 = log(I1_0);
+        TC1_0 = log(C1_0);
+        // strain 2
+        TS2_0 = log(S2_0);
+        TI2_0 = log(I2_0);
+        TC2_0 = log(C2_0);
+        // strain 3
+        TS3_0 = log(S3_0);
+        TI3_0 = log(I3_0);
+        TC3_0 = log(C3_0);
+        // strain 4
+        TS4_0 = log(S4_0);
+        TI4_0 = log(I4_0);
+        TC4_0 = log(C4_0);
+"
+
+######################################
+## miscellaneous plotting functions ##
+######################################
 
 ## convenience plotting functions to plot residuals and means from pfilters
 plot.resids <- function(pf, standardize=FALSE) {
