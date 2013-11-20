@@ -165,6 +165,33 @@ print(round(logLik(pfR),1))
 
 (as.numeric(tictoc.pfR)/as.numeric(tictoc.pfC))
 
+#######################
+## miffing the data  ##
+#######################
+
+estpars <- c("lambda")
+replicate(
+        n=10, {
+                theta.guess <- paramsFourStrain
+                theta.guess[estpars] <- rlnorm(
+                        n=length(estpars),
+                        meanlog=log(theta.guess[estpars]),
+                        sdlog=.1
+                )
+                mif(
+                        tsirC_short,
+                        Nmif=100,
+                        start=theta.guess,
+                        transform=TRUE,
+                        pars=estpars,
+                        rw.sd=c(lambda=0.02),
+                        Np=1000,
+                        var.factor=4,
+                        ic.lag=10,
+                        cooling.factor=0.999,
+                        max.fail=length(tsirC_short@times)+1
+                ) }
+) -> mf
 
 ####### old code below here. #######
 
