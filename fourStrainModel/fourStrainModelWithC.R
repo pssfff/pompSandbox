@@ -97,10 +97,10 @@ pompBuilder(
 ## first, modify the seasonal basis
 ## chosen to give range between ~.2 and ~1.2
 basisCoefs <- c(1.1,.95,1) # basisCoefs <- c(1.5,-.1,1) 
-betas <- basis %*% basisCoefs
+betas <- as.matrix(basis[,2:4]) %*% basisCoefs
 #plot(betas[1:52], type="l")
 
-paramsModel2 <- c(N=50000,
+paramsFourStrain <- c(N=50000,
                   mu=1/50,
                   rho1=.5, rho2=.1, rho3=.1, rho4=.1,
                   b1=basisCoefs[1], 
@@ -123,16 +123,7 @@ paramsModel2 <- c(N=50000,
 ## in R
 tic <- Sys.time()
 simulate(tsirR, 
-         params=c(
-                 N=50000,
-                 mu=1/500,
-                 rho1=.5, rho2=.1,
-                 beta1=1.4,alpha1=1,alpha2=1,
-                 iota=1/10000,
-                 lambda=1/100,
-                 S1.0=40000,I1.0=100,C1.0=100,
-                 S2.0=40000,I2.0=100,C2.0=100
-         ),
+         params=paramsFourStrain,
          seed=677573454L
 ) -> tsirR
 toc <- Sys.time()
@@ -142,16 +133,7 @@ plot(tsirR, variables=c("cases1", "cases2", "C1","C2", "I1","I2", "S1", "S2"))
 ## in C
 tic <- Sys.time()
 simulate(tsirC, 
-         params=c(
-                 N=50000,
-                 mu=1/500,
-                 rho1=.5, rho2=.1,
-                 beta1=1.4,alpha1=1,alpha2=1,
-                 iota=1/10000,
-                 lambda=1/100,
-                 S1.0=40000,I1.0=100,C1.0=100,
-                 S2.0=40000,I2.0=100,C2.0=100
-         ),
+         params=paramsFourStrain,
          seed=677573454L
 ) -> tsirC
 toc <- Sys.time()
@@ -161,21 +143,12 @@ plot(tsirC, variables=c("cases1", "cases2", "C1","C2", "I1","I2", "S1", "S2"))
 (as.numeric(tictoc1)/as.numeric(tictoc2))
 
 
-
-## simulate data from TSIR model and select just a subset of the data for fitting
-tsirModel2 <- simulate(
-        tsirModel,
-        params=paramsModel2,
-        seed=677573454L
-) 
-
-
 ###########################
 ## run a particle filter ##
 ###########################
 
 ## in C
-tsirC_short <- window(tsirC, start=4500, end=5000)
+tsirC_short <- window(tsirC, start=t.end-10, end=t.end)
 tic <- Sys.time()
 pfC <- pfilter(tsirC_short, Np=100, max.fail=length(tsirC_short@times)+1)
 toc <- Sys.time()
@@ -183,7 +156,7 @@ toc <- Sys.time()
 print(round(logLik(pfC),1))
 
 ## in R
-tsirR_short <- window(tsirR, start=4500, end=5000)
+tsirR_short <- window(tsirR, start=t.end-10, end=t.end)
 tic <- Sys.time()
 pfR <- pfilter(tsirR_short, Np=100, max.fail=length(tsirC_short@times)+1)
 toc <- Sys.time()
