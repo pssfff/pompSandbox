@@ -11,26 +11,29 @@ source("fourStrainFuncs.R")
 ############################
 
 ## make spline basis
-tbasis <- seq(0, 100, by=1/26)
-basis <- periodic.bspline.basis(tbasis,nbasis=3,degree=2,period=1,names="seas%d")
+t.end <- 100
+step <- 1/26
+tbasis <- seq(0, t.end, by=step)
+basis <- cbind(time=tbasis,
+               as.data.frame(periodic.bspline.basis(tbasis,nbasis=3,degree=2,period=1,names="seas%d")))
 
 ## define state names for easy assignment
 statenames <- c(paste0("I", 1:4), paste0("S", 1:4), paste0("C", 1:4))
 ic.names <- paste0(statenames, ".0")
                 
 ## create the TSIR pomp object 
-tsirModel <- pomp(
+tsirR <- pomp(
         data=data.frame(
-                time=seq(0, 100,by=1/26),
+                time=tbasis,
                 cases1=NA, cases2=NA, cases3=NA, cases4=NA
         ),
         times="time",
-        tcovar=tbasis,
+        tcovar="time",
         covar=basis,
         t0=0,
         rprocess=discrete.time.sim(
                 step.fun=fourStrainProcSim,
-                delta.t=1/26
+                delta.t=step
         ),
         rmeasure=fourStrainMeasSim,
         dmeasure=fourStrainMeasDens,
@@ -38,7 +41,8 @@ tsirModel <- pomp(
         parameter.transform=partransR,
         ## from natural scale to estimation scale
         parameter.inv.transform=paruntransR,
-        paramnames=c("N", "mu", "rho1", "rho2", 
+        paramnames=c("N", "mu", 
+                     "rho1", "rho2", "rho3", "rho4", 
                      "b1", "b2", "b3", 
                      "alpha1", "alpha2",
                      "iota", "lambda",
@@ -52,34 +56,38 @@ tsirModel <- pomp(
 
 ## in C
 pompBuilder(
-        name="TSIR",
+        name="TSIR_four_strain",
         data=data.frame(
-                time=seq(0, 5000,by=1),
+                time=seq(0, t.end, by=step),
                 cases1=NA,
-                cases2=NA
+                cases2=NA,
+                cases3=NA,
+                cases4=NA
         ),
         times="time",
         t0=0,
         dmeasure=dmeas,
         rmeasure=rmeas,
         step.fn=step.fn,
-        step.fn.delta.t=1, ## not really treating this as a continuous system
+        step.fn.delta.t=step, ## not really treating this as a continuous system
         skeleton.type="vectorfield",
         skeleton=skel,
         tcovar="time",
+        covar=basis,
         parameter.transform=partrans,
         parameter.inv.transform=paruntrans,
-        ic.pars=c("S1.0","I1.0","C1.0", 
-                  "S2.0","I2.0","C2.0"), 
+        ## parameter and state stuff
+        paramnames=c("N", "mu", 
+                     "rho1", "rho2", "rho3", "rho4", 
+                     "b1", "b2", "b3", 
+                     "alpha1", "alpha2",
+                     "iota", "lambda",
+                     ic.names),
+        # initial condition parameters 
+        ic.pars=ic.names,
         # names of the compartments
-        comp.names=c("S1","I1","C1", "S2","I2","C2"),
-        # names of the parameters
-        paramnames=c("N", "mu", "rho1", "rho2", 
-                     "beta1", "alpha1", "alpha2",
-                     "iota", "lambda", 
-                     "S1.0", "I1.0", "C1.0",
-                     "S2.0", "I2.0", "C2.0"),
-        statenames=c("S1","I1","C1", "S2","I2","C2")
+        comp.names=statenames,
+        statenames=statenames
 ) -> tsirC
 
 ##########################################
@@ -107,12 +115,85 @@ paramsModel2 <- c(N=50000,
                   S4.0=10000,I4.0=100,C4.0=100
 )
 
+
+#####################
+## simulate models ##
+#####################
+
+## in R
+tic <- Sys.time()
+simulate(tsirR, 
+         params=c(
+                 N=50000,
+                 mu=1/500,
+                 rho1=.5, rho2=.1,
+                 beta1=1.4,alpha1=1,alpha2=1,
+                 iota=1/10000,
+                 lambda=1/100,
+                 S1.0=40000,I1.0=100,C1.0=100,
+                 S2.0=40000,I2.0=100,C2.0=100
+         ),
+         seed=677573454L
+) -> tsirR
+toc <- Sys.time()
+(tictoc1 <- toc-tic)
+plot(tsirR, variables=c("cases1", "cases2", "C1","C2", "I1","I2", "S1", "S2"))
+
+## in C
+tic <- Sys.time()
+simulate(tsirC, 
+         params=c(
+                 N=50000,
+                 mu=1/500,
+                 rho1=.5, rho2=.1,
+                 beta1=1.4,alpha1=1,alpha2=1,
+                 iota=1/10000,
+                 lambda=1/100,
+                 S1.0=40000,I1.0=100,C1.0=100,
+                 S2.0=40000,I2.0=100,C2.0=100
+         ),
+         seed=677573454L
+) -> tsirC
+toc <- Sys.time()
+(tictoc2 <- toc-tic)
+plot(tsirC, variables=c("cases1", "cases2", "C1","C2", "I1","I2", "S1", "S2"))
+
+(as.numeric(tictoc1)/as.numeric(tictoc2))
+
+
+
 ## simulate data from TSIR model and select just a subset of the data for fitting
 tsirModel2 <- simulate(
         tsirModel,
         params=paramsModel2,
         seed=677573454L
 ) 
+
+
+###########################
+## run a particle filter ##
+###########################
+
+## in C
+tsirC_short <- window(tsirC, start=4500, end=5000)
+tic <- Sys.time()
+pfC <- pfilter(tsirC_short, Np=100, max.fail=length(tsirC_short@times)+1)
+toc <- Sys.time()
+(tictoc.pfC <- toc-tic)
+print(round(logLik(pfC),1))
+
+## in R
+tsirR_short <- window(tsirR, start=4500, end=5000)
+tic <- Sys.time()
+pfR <- pfilter(tsirR_short, Np=100, max.fail=length(tsirC_short@times)+1)
+toc <- Sys.time()
+(tictoc.pfR <- toc-tic)
+print(round(logLik(pfR),1))
+
+(as.numeric(tictoc.pfR)/as.numeric(tictoc.pfC))
+
+
+####### old code below here. #######
 
 tsirModel2_Short <- window(tsirModel2, start=90, end=100)
 #plot(tsirModel2, variables=c("I1","I2", "I3", "I4"))
