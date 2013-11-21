@@ -150,7 +150,7 @@ plot(tsirC, variables=c("C1","C2", "C3", "C4", "I1","I2", "I3", "I4"))
 
 ## start with the truth, with initial conditions adjusted for windowing   
 dur <- 10 ## duration of time series
-index0 <- max(which(tsirC@times<t.end-dur))## variables for timezero
+index0 <- max(which(tsirC@times<=t.end-dur))## variables for timezero
 theta.truth <- paramsFourStrain     
 theta.truth[ic.names] <- states(tsirC)[statenames,index0]
 
@@ -158,7 +158,9 @@ theta.truth[ic.names] <- states(tsirC)[statenames,index0]
 ## in C
 tsirC_short <- window(tsirC, start=t.end-dur, end=t.end)
 tic <- Sys.time()
-pfC <- pfilter(tsirC_short, params=theta.truth, Np=100, max.fail=length(tsirC_short@times)+1)
+pfC <- pfilter(tsirC_short, params=theta.truth, Np=1000, 
+               max.fail=length(tsirC_short@times)+1,
+               pred.mean=TRUE, filter.mean=TRUE)
 toc <- Sys.time()
 (tictoc.pfC <- toc-tic)
 print(round(logLik(pfC),1))
@@ -177,10 +179,10 @@ print(round(logLik(pfC),1))
 ## miffing the data  ##
 #######################
 
-nmif <- 10
+nmif <- 15
 ## parallelizing
 require(doMC)
-registerDoMC(10)
+registerDoMC(15)
 estpars <- c("lambda")
 tic <- Sys.time()
 mf <- foreach(i=1:nmif) %dopar% {
@@ -188,17 +190,16 @@ mf <- foreach(i=1:nmif) %dopar% {
         theta.guess[estpars] <- rlnorm(
                 n=length(estpars),
                 meanlog=log(theta.guess[estpars]),
-                sdlog=.1
-        )
+                sdlog=.3)
         mif(
                 tsirC_short,
-                Nmif=100,
+                Nmif=200,
                 start=theta.guess,
                 transform=TRUE,
                 pars=estpars,
-                rw.sd=c(lambda=0.02),
-                Np=2000,
-                var.factor=4,
+                rw.sd=c(lambda=0.02), 
+                Np=10000,
+                var.factor=1, ## can adjust parameter jumps between iterations?
                 ic.lag=10,
                 cooling.factor=0.999,
                 max.fail=length(tsirC_short@times)+1
