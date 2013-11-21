@@ -111,8 +111,7 @@ tsirModel2_Short <- window(tsirModel2, start=90, end=100)
 ## start with the truth, adjusted for windowing   
 index0 <- max(which(tsirModel2@times<90))## variables for timezero
 theta.truth <- paramsModel2     
-time0names <- c("S1.0", "I1.0", "C1.0", "S2.0", "I2.0", "C2.0", "S3.0", "I3.0", "C3.0", "S4.0", "I4.0", "C4.0")
-theta.truth[time0names] <- states(tsirModel2)[,index0]
+theta.truth[ic.names] <- states(tsirModel2)[statenames,index0]
 
 pf.truth <- pfilter(tsirModel2_Short, params=theta.truth, 
                     Np=4000, max.fail=261, tol=1e-15,
