@@ -163,15 +163,15 @@ toc <- Sys.time()
 (tictoc.pfC <- toc-tic)
 print(round(logLik(pfC),1))
 
-## in R
-tsirR_short <- window(tsirR, start=t.end-dur, end=t.end)
-tic <- Sys.time()
-pfR <- pfilter(tsirR_short, params=theta.truth, Np=100, max.fail=length(tsirC_short@times)+1)
-toc <- Sys.time()
-(tictoc.pfR <- toc-tic)
-print(round(logLik(pfR),1))
-
-(as.numeric(tictoc.pfR)/as.numeric(tictoc.pfC))
+# ## in R
+# tsirR_short <- window(tsirR, start=t.end-dur, end=t.end)
+# tic <- Sys.time()
+# pfR <- pfilter(tsirR_short, params=theta.truth, Np=100, max.fail=length(tsirC_short@times)+1)
+# toc <- Sys.time()
+# (tictoc.pfR <- toc-tic)
+# print(round(logLik(pfR),1))
+# 
+# (as.numeric(tictoc.pfR)/as.numeric(tictoc.pfC))
 
 #######################
 ## miffing the data  ##
@@ -207,3 +207,5 @@ mf <- foreach(i=1:nmif) %dopar% {
 toc <- Sys.time()
 (toc-tic)
 compare.mif(mf)
+
+save.image(file="mifExample_20131121.rda")
