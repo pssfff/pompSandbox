@@ -149,7 +149,7 @@ plot(tsirC, variables=c("C1","C2", "C3", "C4", "I1","I2", "I3", "I4"))
 ###########################
 
 ## start with the truth, with initial conditions adjusted for windowing   
-dur <- 10 ## duration of time series
+dur <- 30 ## duration of time series
 index0 <- max(which(tsirC@times<=t.end-dur))## variables for timezero
 theta.truth <- paramsFourStrain     
 theta.truth[ic.names] <- states(tsirC)[statenames,index0]
@@ -158,12 +158,13 @@ theta.truth[ic.names] <- states(tsirC)[statenames,index0]
 ## in C
 tsirC_short <- window(tsirC, start=t.end-dur, end=t.end)
 tic <- Sys.time()
-pfC <- pfilter(tsirC_short, params=theta.truth, Np=1000, 
+pfC <- pfilter(tsirC_short, params=theta.truth, Np=20000, 
                max.fail=length(tsirC_short@times)+1,
                pred.mean=TRUE, filter.mean=TRUE)
 toc <- Sys.time()
 (tictoc.pfC <- toc-tic)
 print(round(logLik(pfC),1))
+plot.means(pfC)
 
 # ## in R
 # tsirR_short <- window(tsirR, start=t.end-dur, end=t.end)
@@ -198,7 +199,7 @@ mf <- foreach(i=1:nmif) %dopar% {
                 transform=TRUE,
                 pars=estpars,
                 rw.sd=c(lambda=0.02), 
-                Np=10000,
+                Np=20000,
                 var.factor=1, ## can adjust parameter jumps between iterations?
                 ic.lag=10,
                 cooling.factor=0.999,
@@ -209,4 +210,4 @@ toc <- Sys.time()
 (toc-tic)
 compare.mif(mf)
 
-save.image(file="mifExample_20131121.rda")
+save.image(file="mifExample_20131217.rda")

@@ -1,6 +1,7 @@
 \documentclass{article}
 \begin{document}
 <<test>>=
+tidy.source(replace.assign=FALSE)
 1:5 -> a
 @
 \end{document}

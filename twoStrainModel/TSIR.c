@@ -107,7 +107,11 @@ void TSIR_dmeasure (double *__lik, double *__y, double *__x, double *__p, int gi
  
         double lik1 = dbinom(cases1, I1, rho1, give_log);
         double lik2 = dbinom(cases2, I2, rho2, give_log);
+        double tol = 10E-15;
         lik = lik1*lik2;
+        if ( isnan(lik) ) {
+                lik = tol;
+        };
  
 }
 
