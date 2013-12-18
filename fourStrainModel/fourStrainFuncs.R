@@ -58,18 +58,26 @@ step.fn <- '
         int allI = I1 + I2 + I3 + I4;
         S1 += N*mu - allI + C1_loss;
         if ( S1 <=0 ) S1 = 0;
+        if ( S1 >=N ) S1 = N;
         S2 += N*mu - allI + C2_loss;
         if ( S2 <=0 ) S2 = 0;
+        if ( S2 >=N ) S2 = N;
         S3 += N*mu - allI + C3_loss;
         if ( S3 <=0 ) S3 = 0;
+        if ( S3 >=N ) S3 = N;
         S4 += N*mu - allI + C4_loss;
         if ( S4 <=0 ) S4 = 0;
+        if ( S4 >=N ) S4 = N;
 
         // update cross-protected counts 
         C1 += C1_add - C1_loss;
+        if ( C1 >=N ) C1 = N;
         C2 += C2_add - C2_loss;
+        if ( C2 >=N ) C2 = N;
         C3 += C3_add - C3_loss;
+        if ( C3 >=N ) C3 = N;
         C4 += C4_add - C4_loss;
+        if ( C4 >=N ) C4 = N;
 '
 skel <- '
 return;

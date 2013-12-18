@@ -96,9 +96,9 @@ pompBuilder(
 
 ## first, modify the seasonal basis
 ## chosen to give range between ~.2 and ~1.2
-basisCoefs <- c(1.1,.95,1) # basisCoefs <- c(1.5,-.1,1) 
+basisCoefs <- c(2.5,.5,1) # basisCoefs <- c(1.5,-.1,1) 
 betas <- as.matrix(basis[,2:4]) %*% basisCoefs
-#plot(betas[1:52], type="l")
+plot(betas[1:52], type="l")
 
 paramsFourStrain <- c(N=50000,
                   mu=1/50,
@@ -108,7 +108,7 @@ paramsFourStrain <- c(N=50000,
                   b3=basisCoefs[3], 
                   alpha1=1,alpha2=1,
                   iota=1/700,
-                  lambda=1/50,
+                  lambda=1/52, ## 1/k indicates a protection of k time points = k/26 years?
                   S1.0=10000,I1.0=100,C1.0=100,
                   S2.0=10000,I2.0=100,C2.0=100,
                   S3.0=10000,I3.0=100,C3.0=100,
@@ -120,15 +120,15 @@ paramsFourStrain <- c(N=50000,
 ## simulate models ##
 #####################
 
-## in R
-tic <- Sys.time()
-simulate(tsirR, 
-         params=paramsFourStrain,
-         seed=677573454L
-) -> tsirR
-toc <- Sys.time()
-(tictoc1 <- toc-tic)
-plot(tsirR, variables=c("cases1", "cases2", "C1","C2", "I1","I2", "S1", "S2"))
+# ## in R
+# tic <- Sys.time()
+# simulate(tsirR, 
+#          params=paramsFourStrain,
+#          seed=677573454L
+# ) -> tsirR
+# toc <- Sys.time()
+# (tictoc1 <- toc-tic)
+# plot(tsirR, variables=c("cases1", "cases2", "C1","C2", "I1","I2", "S1", "S2"))
 
 ## in C
 tic <- Sys.time()
