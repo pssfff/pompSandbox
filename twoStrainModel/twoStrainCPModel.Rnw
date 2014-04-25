@@ -160,7 +160,8 @@ toy.meas.sim <- function(x, t, params, ...) {
 @
 
 And now we can simulate this framework
-<<simulateToyTSIR, cache=TRUE>>=
+<<simulateToyTSIR, cache=TRUE, message=FALSE>>=
+require(pomp)
 simulate(
         pomp(
                 data=data.frame(
@@ -199,6 +200,60 @@ plot(tsir, variables=c("y1", "y2", "C1","C2", "I1","I2", "S1", "S2"))
 \subsection{Maximization by iterated filtering (MIF)}
 
 \subsection{Classical auto-regressive time series model (AR)}
+As an alternative to the MIF methodology, we propose a simpler algorithm that uses classical auto-regressive (AR) statistical models to draw inference about the presence or absence (and the duration of) cross-protection in a two-strain system. If cross-protection exists between these strains, then recent cumulative counts from strain $i$ should be negatively correlated with the current count for strain $j$. We can simply operationalize this by creating new variables that correspond to sums of recent counts of other strains, a.k.a. ``memory terms''. For example, if we specify a value $k$, we could create a model
+\begin{eqnarray}
+\log {\mathbb E}[ Y_{i,t}|Y_{\cdot,t-1}, \dots, Y_{\cdot,t-k}] & = & \log\beta_t + \gamma_1 \log Y_{i,t-1} + \gamma_2 \log M_{t,k}
+\end{eqnarray}
+where the $M_{t,k} = \sum_{t'=t-k}^{t-1} Y_{j,t'}$. 
+
+<<implementAR>>=
+createMemory <- function(pompDat, k) {
+        ## assume that dat is a two-strain pomp object
+        ## k is a duration
+        ## first, we will create a matrix to help with the memory term summations.
+        ## this matrix will have 0s and 1s and will be multiplied by the data vectors
+        
+        dat <- pompDat@data
+        ## vector of 1s of length k
+        vec1 <- rep(1, k)
+        ## vector of 0s of length ncol(dat)-k+1
+        vec0 <- rep(0, ncol(dat)-k+1)
+        ## the matrix
+        memMatrixRows <- ncol(dat)-k
+        firstReps <- rep(c(vec1, vec0), times=memMatrixRows-1)
+        last1s <- c(vec1,0)
+        memMatrix <- matrix(c(firstReps, last1s), byrow=TRUE, nrow=memMatrixRows)
+        M1 <- memMatrix%*%dat[2,]
+        M2 <- memMatrix%*%dat[1,]
+        
+        dataIdx <- (k+1):ncol(dat)
+        dat1 <- data.frame(y=dat[1,dataIdx], 
+                           yAR = dat[1, dataIdx-1],
+                           M=M1, 
+                           time=pompDat@times[dataIdx],
+                           strain=1)
+        dat2 <- data.frame(y=dat[2,dataIdx], 
+                           yAR = dat[1, dataIdx-1],
+                           M=M2,
+                           time=pompDat@times[dataIdx],
+                           strain=2)
+        data <- rbind(dat1, dat2)
+        return(data)
+}
+
+## loop to calculate best k
+nK <- 200
+logLiks <- matrix(NA, ncol=2, nrow=nK)
+colnames(logLiks) <- c("k", "loglik")
+for(i in 1:nK){
+        k <- logLiks[i,"k"] <- i
+        dat <- createMemory(tsir, k=k)
+        m1 <- glm(y ~ yAR + M, data=dat, family="poisson")
+        logLiks[i,"loglik"] <- logLik(m1)
+        message(paste("finished iteration", i, Sys.time()))
+}
+@
+
 
 \subsection{Comparison of methods: simulation study}
 
