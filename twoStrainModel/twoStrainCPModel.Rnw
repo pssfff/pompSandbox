@@ -206,16 +206,22 @@ As an alternative to the MIF methodology, we propose a simpler algorithm that us
 \end{eqnarray}
 where the $M_{t,k} = \sum_{t'=t-k}^{t-1} Y_{j,t'}$. 
 
-<<implementAR>>=
-createMemory <- function(pompDat, k) {
+<<implementAR, message=FALSE>>=
+require(ggplot2)
+createMemory <- function(pompDat, k, lambda=NULL) {
         ## assume that dat is a two-strain pomp object
         ## k is a duration
+        ## lambda is an exponential parameter
         ## first, we will create a matrix to help with the memory term summations.
         ## this matrix will have 0s and 1s and will be multiplied by the data vectors
         
         dat <- pompDat@data
         ## vector of 1s of length k
-        vec1 <- rep(1, k)
+        if(is.null(lambda)) {
+                vec1 <- rep(1, k)
+        } else {
+                vec1 <- 1-pexp(0:(k-1), rate=1/lambda)
+        }
         ## vector of 0s of length ncol(dat)-k+1
         vec0 <- rep(0, ncol(dat)-k+1)
         ## the matrix
@@ -240,7 +246,9 @@ createMemory <- function(pompDat, k) {
         data <- rbind(dat1, dat2)
         return(data)
 }
+@
 
+<<memoryLoop1, message=FALSE, cache=TRUE>>=
 ## loop to calculate best k
 nK <- 200
 logLiks <- matrix(NA, ncol=2, nrow=nK)
@@ -255,6 +263,23 @@ for(i in 1:nK){
 qplot(k, loglik, data=data.frame(logLiks), geom="line")
 @
 This is promising preliminary results. Could we use exponential weights in the memory matrix to actually have this estimate a duration of cross-protection? Right now, this model assumes more of a fixed duration model of cross-protection by assuming that all cases observed some number of time periods ago should count towards the memory. But since this is simulated from an exponential model, some of those have already gone back to susceptibility.
+
+<<memoryLoop1, message=FALSE, cache=TRUE>>=
+## loop for calculating best lambda
+nLam <- 200
+logLiks2 <- matrix(NA, ncol=3, nrow=nLam)
+colnames(logLiks2) <- c("k", "lambda", "loglik")
+for(i in 1:nLam){
+        k <- logLiks2[i,"k"] <- 200
+        lambda <- logLiks2[i,"lambda"] <- i
+        dat <- createMemory(tsir, k=k, lambda=lambda)
+        m1 <- glm(y ~ yAR + M, data=dat, family="poisson")
+        logLiks2[i,"loglik"] <- logLik(m1)
+        message(paste("finished iteration", i, Sys.time()))
+}
+qplot(lambda, loglik, data=data.frame(logLiks2), geom="line")
+@
+
 
 \subsection{Comparison of methods: simulation study}
 
