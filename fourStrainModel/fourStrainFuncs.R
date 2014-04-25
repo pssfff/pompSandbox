@@ -75,13 +75,13 @@ plot.resids <- function(pf, standardize=FALSE) {
         
 }
 
-plot.means <- function(pf) {
+plot.means <- function(pf, ...) {
         par(mfrow=c(2,2))
         par(mar=c(4,4,1,1))
-        mean1 <- pred.mean(pf)['I1',]*pf@params['rho1']
-        mean2 <- pred.mean(pf)['I2',]*pf@params['rho2']
-        mean3 <- pred.mean(pf)['I3',]*pf@params['rho3']
-        mean4 <- pred.mean(pf)['I4',]*pf@params['rho4']                
+        mean1 <- pred.mean(pf)['I1',...]*pf@params['rho1']
+        mean2 <- pred.mean(pf)['I2',...]*pf@params['rho2']
+        mean3 <- pred.mean(pf)['I3',...]*pf@params['rho3']
+        mean4 <- pred.mean(pf)['I4',...]*pf@params['rho4']                
         
         ylim <- range(mean1, mean2, mean3, mean4, pf@data[c("y1", "y2", "y3", "y4"),])
         plot(mean1, type='o', col=2, ylab='y1', xlab='weeks', ylim=ylim)

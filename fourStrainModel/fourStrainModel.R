@@ -101,22 +101,32 @@ tsirModel2 <- simulate(
         seed=677573454L
 ) 
 
-tsirModel2_Short <- window(tsirModel2, start=90, end=100)
+start.time <- 90
+tsirModel2_Short <- window(tsirModel2, start=start.time, end=100)
 #plot(tsirModel2, variables=c("I1","I2", "I3", "I4"))
 #plot(tsirModel2, variables=c("S1","S2", "S3", "S4"))
 
-
-
-
 ## start with the truth, adjusted for windowing   
-index0 <- max(which(tsirModel2@times<90))## variables for timezero
-theta.truth <- paramsModel2     
+index0 <- max(which(tsirModel2@times==start.time))## variables for timezero
+theta.truth <- theta.truth.short <- paramsModel2     
 time0names <- c("S1.0", "I1.0", "C1.0", "S2.0", "I2.0", "C2.0", "S3.0", "I3.0", "C3.0", "S4.0", "I4.0", "C4.0")
-theta.truth[time0names] <- states(tsirModel2)[,index0]
+theta.truth.short[time0names] <- states(tsirModel2)[,index0]
 
-pf.truth <- pfilter(tsirModel2_Short, params=theta.truth, 
-                    Np=4000, max.fail=261, tol=1e-15,
+## truth with shortened sequence -- pred.means are not on! still unstable every time we run it.
+pf.truth.short <- pfilter(tsirModel2_Short, params=theta.truth.short, 
+                          Np=2000, max.fail=length(tsirModel2_Short@times), 
+                          tol=1e-15, pred.mean=TRUE, filter.mean=TRUE)
+plot.means(pf.truth.short)
+
+
+## truth with full sequence -- pred.means are spot on!
+pf.truth <- pfilter(tsirModel2, params=theta.truth, 
+                    Np=50, max.fail=2601, tol=1e-15,
                     pred.mean=TRUE, filter.mean=TRUE)
+plot.means(pf.truth)
+plot.resids(pf.truth)
+
+
 
 ## now a small lie (1% from the truth)
 theta.lie.small <- theta.truth
