@@ -1,0 +1,207 @@
+\documentclass[12pt]{article} % article?
+\usepackage{geometry} %
+\geometry{a4paper} % or letter or a5paper or ... etc
+\usepackage{graphicx}
+\usepackage{amssymb,amsmath, bm}
+\geometry{letterpaper, top=1in, left=1in, right=1in, bottom=1in} % to set margins
+
+\usepackage{setspace}
+\onehalfspacing
+
+\title{Simplified inference for interacting time-series}
+\author{Nicholas G Reich}
+
+
+%%% BEGIN DOCUMENT
+\begin{document}
+
+%opts_chunk$set(concordance=TRUE, tidy=TRUE)
+
+\maketitle
+
+\tableofcontents
+
+\section{Simplifying inference in complex systems}
+\subsection{Setting: interactions between multiple time-series}
+\subsection{Simulation showing increased power for simple, wrong model}
+\subsection{Limitations of simple inference}
+
+\section{Modeling interactions between multiple disease strains}
+\subsection{A disease transmission model}
+We specify a model for a multivariate time series, measured in discrete time units. Each time series, representing case counts for a particular disease is represented by $Y_{i,t}$, the number of observed cases of disease $i$ within a particular time window $t$. Furthermore, $X_{i,t}$ are the total number of cases occuring in time $t$. The theoretical transmission model (adapted from Finkenstadt and Grenfell) could be written as
+\begin{equation}
+X_{i,t} = \beta_t \cdot X_{i,t-1}^{\alpha_1} \cdot S_{i,t-1}^{\alpha_2}
+\end{equation}
+where $S_{i,t}$ is the number of susceptible individuals to disease $i$ at time $t$ and 
+% lifted from supplemental materials of JRSI paper
+the $\beta_t$ are a time-varying transmission parameters.  
+The $\alpha$ are mixing parameters, which, if both equal 1, define a population with homogeneous mixing whereas values not equal to 1 have been used to describe departures from mass-action mixing 
+%\cite{liu1987dynamical} 
+and to account for discretization of continuous time transmission processes 
+%\cite{glass2003interpreting}
+.
+
+
+Therefore, a statistical formulation of the theoretical transmission model would be
+\begin{eqnarray}
+\log {\mathbb E}[ X_{i,t}|X_{\cdot,t-1}, S_{i,t-1}] & = & \log\beta_t + \alpha_1 \log X_{t-1} + \alpha_2 \log S_{i,t-1}
+\end{eqnarray}
+where the $\beta_t$ coefficients represent the seasonal baselines, i.e. $\beta_t = \beta_{t \mod 26}$ if our timestep is biweeks, and $p_t$ are time-varying case-reporting probabilities. We intentionally leave the distributional assumption for $X_{i,t}$ unspecified for now, although it would likely be specified as Poisson or Negative Binomial.
+
+We are interested in models where multiple pathogens are interacting with each other, with common interactions being temporary cross-protection and/or susceptible enhancement. A simplified, two-strain version of our previously published compartmental model representation of a model of cross-protection is shown in Figure \ref{fig:compartments}. This shows two susceptible compartments ($S_1$ and $S_2$ (one for each strain), a single $CP$ compartment (representing temporary cross-protection from infection with the other strain) and infected ($I$) and recovered ($R$) compartments for each strain.
+
+\begin{figure}[htbp]
+\begin{center}
+\caption{Compartmental model for two-strain cross-protection model.}
+\label{fig:compartments}
+\includegraphics[width=.7\linewidth]{compartmentModel2.jpg}
+\end{center}
+\end{figure}
+
+
+The heart of this cross-protection model resides in our definition of the $S_{i,t}$. In the past, we have defined this measure of susceptibility by parameterizing the state of cross-protection:
+\begin{eqnarray}
+S_{i,t} & = &  B_{t-d} + S_{i,t-1} - X_{i,t} - \delta \cdot Q_{i,t} \label{eq:generalSuscModel}
+%S_{i,t} & = & S_{i,t-1} + B_{t-d} - X_{i,t} -\delta\sum_{j\neq i}[X_{j,t-1}- X_{j,t-(k+1)}]. 
+\end{eqnarray}
+where the $Q_{i,t}$ term represents the balance of individuals moving into and out of the susceptible pool for strain $i$ at time $t$. This term may take on different forms depending on the mechanistic process assumed about how individuals enter and leave the pool of susceptible individuals based on cross-protection and enhancement. Based on previous work, we could assume a model with a fixed duration of cross-protection, in which case, $Q_{i,t}(k) = \sum_{j\neq i}[X_{j,t-1}- X_{j,t-(k+1)}]$ where $Q$ depends on the parameter $k$, the fixed duration of cross-protection.
+
+
+\subsection{The observation process model}
+The observation process could be modeled as 
+\begin{eqnarray}
+Y_{i,t} | X_{i,t} & \sim & Binomial(p_{i,t}, X_{i,t})
+%\bm{Y_t} | \bm{X_t} & \sim & Multinomial(\bm{p_t}, N_t)
+\end{eqnarray}
+where the $p_{i,t}$ are calculated based on, say, a standard susceptible reconstruction. %It would probably even be more accurate to say that $p_{i,t}\sim Beta(a,b)$ such that the mean of the beta distribution is equal to that of the estimated $p$ from the susceptible reconstruction, and the variance is equal to that of resulting from the fit.
+%some known disease-specific reporting fractions that are varying over time and $N_t$ is the total number of cases of any disease under consideration observed at time $t$. For example, we observe four under-reported serotype-specific case counts over time (the $Y_{i,t}$, or more succinctly, the $\bm{Y_t}$ and one total case count ($N_t$). Then, the $\bm{p_t}$ could be estimated by $p_{i,t} = \frac{Y_{i,t}}{N_t}$. 
+
+
+
+
+\section{Inference for a two-strain interaction model}
+
+\subsection{Model definition}
+%Let's start with a similar but simpler version of the model presented above:
+%\begin{eqnarray}
+%\log {\mathbb E}[ X_{i,t}|X_{\cdot,t-1}, S_{i,t-1}] & = & \log\beta + \alpha_1 \log X_{t-1} + \alpha_2 \log S_{i,t-1}\\
+%S_{i,t} & = &  B + S_{i,t-1} - \sum_j X_{j,t} +  \\
+%C_{i,t} & = &  C_{i,t-1} + \sum{j \neq i}X_{j,t} \\
+%Q_{i,t} & = &  \sum_{j\neq i}[X_{j,t-1}- X_{j,t-(k+1)}]
+%\end{eqnarray}
+I created a model that is similar to the theoretical four-strain model shown above but with a few major departures from the above models:
+\begin{itemize}
+\item Assume only two strains.
+\item Assume $\beta$ is constant.
+\item Assume births are constant B.
+\item Assume any infected individual has an exponentially distributed duration of cross-protection, with mean $\frac{1}{\lambda}$.
+\end{itemize}
+
+\begin{table}[htdp]
+\caption{Toy model parameters}
+\begin{center}
+\begin{tabular}{ll}
+\bf parameter & \bf description \\ 
+\hline
+$\beta$ & contact rate \\ 
+$\lambda$ & 1/mean duration of cross-protection \\
+$\alpha_1$, $\alpha_2$ & mixing parameters \\ 
+$N$ & population size \\
+$\mu$ & birth rate \\ 
+$\iota$ & rate of imported infections \\ 
+\end{tabular}
+\end{center}
+\label{toyParams}
+\end{table}%
+
+
+Model parameters are shown in Table \ref{toyParams}. The model was initialized with a vector of six initial values for the $S$, $I$ and $CP$ compartments for each strain and was simulated using the following framework:
+\begin{eqnarray}
+X_{i,t} & \sim & Poisson\left ( \beta \cdot (\frac{X_{i,t-1}}{N}+\iota)^{\alpha_1}\cdot S_{i,t-1}^{\alpha_2}\right ) \\
+NS_{i,t} & \sim & Poisson(\lambda \cdot CP_{i,t-1}) \\
+S_{i,t} & = & S_{i,t-1} + N\cdot\mu - \sum_{\forall j} X_{j,t} + NS_{1,t} \\ 
+CP_{i,t} & = & CP_{i,t-1} - NS_{i,t} + \sum_{j\neq i}X_{j,t} 
+\end{eqnarray}
+Note that the $NS$ quantity stands for ``newly susceptible'', i.e. these are the individuals who are heading out of the cross-protected state ($CP$) and back to being susceptible. The trick that we have used here is that by assuming the cross protection is exponentially distributed and by keeping track explicitly of $CP_{i,t}$ we can use the memoryless property of exponential survival to calculate how many individuals will leave the CP class only using the current count of inviduals in CP and $\lambda$. Currently am implementing this by drawing a Poisson with mean $\lambda\cdot CP_t$, but is this completely right? 
+
+<<simpleProcSim>>=
+toy.proc.sim <- function(x, t, params, delta.t, ...) {
+        ## unpack the params vector:
+        beta <- params["beta"]
+        alpha1 <- params["alpha1"]
+        alpha2 <- params["alpha2"]
+        lambda <- params["lambda"]
+        mu <- params["mu"]
+        N <- params["N"]
+        iota <- params["iota"]
+        ## copy x for easy access
+        newx <- x
+        ## transitions for each strain
+        newx["I1"] <- rpois(1, beta*((x["I1"]/N+iota)^alpha1)*(x["S1"]^alpha2))
+        newx["I2"] <- rpois(1, beta*((x["I2"]/N+iota)^alpha1)*(x["S2"]^alpha2))
+        ## Poisson approximation to exponential losses
+        C1.loss <- rpois(1, lambda*x["C1"]) 
+        C2.loss <- rpois(1, lambda*x["C2"]) 
+        ## udpate counts
+        newx["S1"] <- x["S1"] + N*mu - newx["I1"] - newx["I2"] + C1.loss
+        newx["S2"] <- x["S2"] + N*mu - newx["I2"] - newx["I1"] + C2.loss
+        newx["C1"] <- x["C1"] - C1.loss + newx["I2"]
+        newx["C2"] <- x["C2"] - C2.loss + newx["I1"]
+        return(newx[c("S1", "I1", "C1", "S2", "I2", "C2")])
+}
+
+toy.meas.sim <- function(x, t, params, ...) {
+        rho1 <- params["rho1"]
+        rho2 <- params["rho2"]
+        y1 <- rbinom(1, size=x["I1"], prob=rho1)
+        y2 <- rbinom(1, size=x["I2"], prob=rho2)
+        unname(c(y1, y2))
+}
+@
+
+And now we can simulate this framework
+<<simulateToyTSIR, cache=TRUE>>=
+simulate(
+        pomp(
+                data=data.frame(
+                        time=seq(0, 5000,by=1),
+                        y1=NA,
+                        y2=NA
+                ),
+                times="time",
+                t0=0,
+                rprocess=discrete.time.sim(
+                        step.fun=toy.proc.sim,
+                        delta.t=1
+                ),
+                rmeasure=toy.meas.sim,
+                # initial condition parameters 
+                ic.pars=c("S1.0","I1.0","C1.0", 
+                          "S2.0","I2.0","C2.0"), 
+                # names of the compartments
+                comp.names=c("S1","I1","C1", "S2","I2","C2") 
+        ),
+        params=c(
+                N=50000,
+                mu=1/500,
+                rho1=.5, rho2=.1,
+                beta=1.4,alpha1=1,alpha2=1,
+                iota=1/10000,
+                lambda=1/100,
+                S1.0=40000,I1.0=100,C1.0=100,
+                S2.0=40000,I2.0=100,C2.0=100
+        ),
+        seed=677573454L
+) -> tsir
+plot(tsir, variables=c("y1", "y2", "C1","C2", "I1","I2", "S1", "S2"))
+@
+
+\subsection{Maximization by iterated filtering (MIF)}
+
+\subsection{Classical auto-regressive time series model (AR)}
+
+\subsection{Comparison of methods: simulation study}
+
+\subsection{Comparison of methods: analyzing influenza and RSV data}
+
+\end{document}
