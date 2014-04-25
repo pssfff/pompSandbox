@@ -252,8 +252,9 @@ for(i in 1:nK){
         logLiks[i,"loglik"] <- logLik(m1)
         message(paste("finished iteration", i, Sys.time()))
 }
+qplot(k, loglik, data=data.frame(logLiks), geom="line")
 @
-
+This is promising preliminary results. Could we use exponential weights in the memory matrix to actually have this estimate a duration of cross-protection? Right now, this model assumes more of a fixed duration model of cross-protection by assuming that all cases observed some number of time periods ago should count towards the memory. But since this is simulated from an exponential model, some of those have already gone back to susceptibility.
 
 \subsection{Comparison of methods: simulation study}
 
