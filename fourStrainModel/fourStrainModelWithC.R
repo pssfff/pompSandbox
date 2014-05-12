@@ -139,7 +139,7 @@ simulate(tsirC,
 toc <- Sys.time()
 (tictoc2 <- toc-tic)
 plot(tsirC, variables=c("cases1", "cases2", "C1","C2", "I1","I2", "S1", "S2"))
-plot(tsirC, variables=c("C1","C2", "C3", "C4", "I1","I2", "I3", "I4"))
+plot(window(tsirC, start=80, end=100), variables=c("C1","C2", "C3", "C4", "I1","I2", "I3", "I4"))
 
 (as.numeric(tictoc1)/as.numeric(tictoc2))
 

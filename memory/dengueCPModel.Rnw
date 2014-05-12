@@ -124,81 +124,18 @@ CP_{i,t} & = & CP_{i,t-1} - NS_{i,t} + \sum_{j\neq i}X_{j,t}
 \end{eqnarray}
 Note that the $NS$ quantity stands for ``newly susceptible'', i.e. these are the individuals who are heading out of the cross-protected state ($CP$) and back to being susceptible. The trick that we have used here is that by assuming the cross protection is exponentially distributed and by keeping track explicitly of $CP_{i,t}$ we can use the memoryless property of exponential survival to calculate how many individuals will leave the CP class only using the current count of inviduals in CP and $\lambda$. Currently am implementing this by drawing a Poisson with mean $\lambda\cdot CP_t$, but is this completely right? 
 
-<<simpleProcSim, message=FALSE>>=
-require(pomp)
+<<loadStuff, message=FALSE>>=
 require(ggplot2)
-source("twoStrainFuncs.R")
-## make spline basis
-t.end <- 100
-step <- 1/26
-tbasis <- seq(0, t.end, by=step)
-basis <- cbind(time=tbasis,
-               as.data.frame(periodic.bspline.basis(tbasis,nbasis=3,degree=2,period=1,names="seas%d")))
-
-## first, modify the seasonal basis
-## chosen to give range between ~.2 and ~1.2
-basisCoefs <- c(2.5,.5,1) # basisCoefs <- c(1.5,-.1,1) 
-betas <- as.matrix(basis[,2:4]) %*% basisCoefs
-plot(betas[1:52], type="l")
-
-## define state names for easy assignment
-statenames <- c(paste0("I", 1:2), paste0("S", 1:2), paste0("C", 1:2))
-ic.names <- paste0(statenames, ".0")
-
-paramsFourStrain <- c(N=500000,
-                  mu=1/50,
-                  rho1=1, rho2=1, 
-                  b1=basisCoefs[1], 
-                  b2=basisCoefs[2],  
-                  b3=basisCoefs[3], 
-                  alpha1=1,alpha2=1,
-                  iota=1/700,
-                  lambda=1/2, ## 1/k indicates a protection of k time points = k/26 years?
-                  S1.0=10000,I1.0=100,C1.0=100,
-                  S2.0=10000,I2.0=100,C2.0=100
-)
+require(reshape2)
+source("fourStrainMemory.R")
 @
 
-And now we can simulate this framework
-<<simulateToyTSIR, message=FALSE>>=
-pompBuilder(
-        name="TSIR_two_strain",
-        data=data.frame(
-                time=seq(0, t.end, by=step),
-                cases1=NA,
-                cases2=NA
-        ),
-        times="time",
-        t0=0,
-        dmeasure=dmeas,
-        rmeasure=rmeas,
-        step.fn=step.fn,
-        step.fn.delta.t=step, ## not really treating this as a continuous system
-        skeleton.type="vectorfield",
-        skeleton=skel,
-        tcovar="time",
-        covar=basis,
-        parameter.transform=partrans,
-        parameter.inv.transform=paruntrans,
-        ## parameter and state stuff
-        paramnames=c("N", "mu", 
-                     "rho1", "rho2",
-                     "b1", "b2", "b3", 
-                     "alpha1", "alpha2",
-                     "iota", "lambda",
-                     ic.names),
-        # initial condition parameters 
-        ic.pars=ic.names,
-        # names of the compartments
-        comp.names=statenames,
-        statenames=statenames
-) -> tsir
-simulate(tsir, 
-         params=paramsFourStrain#,
-         #seed=677573454L
-) -> tsir
-
-plot(tsir, variables=c("cases1", "cases2", "C1","C2", "I1","I2", "S1", "S2"))
+And now we can load a simulated dataset 
+<<simData, message=FALSE>>=
+raw_data <- read.csv("~/Documents/work/research/dengueCrossProtection/data/simulatedData_fromMI/simdata_5_local/simdata4300.csv", row.names=1)
+raw_melted_data <- melt(raw_data, id.vars="time")
+qplot(time, value, data=raw_melted_data, facets=variable~., geom="line")
+tsirData <- raw_data[,2:5]
 @
 
 \subsection{Maximization by iterated filtering (MIF)}
@@ -210,39 +147,26 @@ As an alternative to the MIF methodology, we propose a simpler algorithm that us
 \end{eqnarray}
 where the $M_{t,k} = \sum_{t'=t-k}^{t-1} Y_{j,t'}$. 
 
-<<memoryLoop1, message=FALSE, eval=FALSE>>=
-## loop to calculate best k
-nK <- 200
-logLiks <- matrix(NA, ncol=2, nrow=nK)
-colnames(logLiks) <- c("k", "loglik")
-for(i in 1:nK){
-        k <- logLiks[i,"k"] <- i
-        dat <- createMemory(tsir, k=k)
-        m1 <- glm(y ~ yAR + M, data=dat, family="poisson")
-        logLiks[i,"loglik"] <- logLik(m1)
-        message(paste("finished iteration", i, Sys.time()))
-}
-qplot(k, loglik, data=data.frame(logLiks), geom="line")
-@
+
 This shows promising preliminary results. Also, we can use exponential weights in the memory matrix to downweight large observations far in the past (where presumably many have passed back into susceptibility already). We tried to also look at whether this could allow us to estimate explicitly a duration of cross-protection, but initial results showed that the highest log-likelihood values for were lower values of $\lambda$ than expected? The formulation with $k$, given above, assumes more of a fixed duration model of cross-protection by assuming that all cases observed some number of time periods ago should count towards the memory. But since this is simulated from an exponential model, some of those have already gone back to susceptibility.
 
 The code below takes this next step and shows how we can optimize with respect to $\lambda$. Preliminary results are promising, showing that when the mean duration of cross-protection is 100 time units, our model suggests a significant improvement of fit by incorporating a $\lambda$ in the model. Alternatively, when the mean duration of cross-protection is 1 time unit, our model suggests that incorporating cross-protection does not benefit our model. These results are based on single data points, simulations are needed to verify more fully.
 <<memoryLoop2, message=FALSE>>=
 ## loop for calculating best lambda
-tsirData <- window(tsir, start=90, end=100)
-plot(tsirData)
 nLam <- 200
-logLiks2 <- matrix(NA, ncol=3, nrow=nLam)
-colnames(logLiks2) <- c("k", "lambda", "loglik")
+logLiks2 <- matrix(NA, ncol=4, nrow=nLam)
+colnames(logLiks2) <- c("k", "lambda", "loglik", "z")
 for(i in 1:nLam){
-        k <- logLiks2[i,"k"] <- 200
+        k <- logLiks2[i,"k"] <- 201
         lambda <- logLiks2[i,"lambda"] <- i
         dat <- createMemory(tsirData, k=k, lambda=lambda)
         m1 <- glm(y ~ yAR + M, data=dat, family="poisson")
+        logLiks2[i,"z"] <- summary(m1)$coef["M","z value"] #logLik(m1)
         logLiks2[i,"loglik"] <- logLik(m1)
         message(paste("finished iteration", i, Sys.time()))
 }
 qplot(lambda, loglik, data=data.frame(logLiks2), geom="line")
+qplot(lambda, z, data=data.frame(logLiks2), geom="line")
 @
 
 
