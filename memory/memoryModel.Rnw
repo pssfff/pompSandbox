@@ -1,0 +1,92 @@
+\documentclass[12pt]{article} % article?
+\usepackage{geometry} %
+\geometry{a4paper} % or letter or a5paper or ... etc
+\usepackage{graphicx}
+\usepackage{amssymb,amsmath, bm}
+\geometry{letterpaper, top=1in, left=1in, right=1in, bottom=1in} % to set margins
+
+\usepackage{setspace}
+\onehalfspacing
+
+\title{A model for cross-protection}
+\author{Nicholas G Reich}
+
+
+%%% BEGIN DOCUMENT
+\begin{document}
+
+%opts_chunk$set(concordance=TRUE, tidy=TRUE)
+
+\maketitle
+
+
+\section{Modeling interactions between multiple disease strains}
+\subsection{A disease transmission model}
+We specify a model for a multivariate time series, measured in discrete time units. Each time series, representing case counts for a particular disease is represented by $Y_{i,t}$, the number of incident observed cases of disease $i$ within a particular time window $t$. Furthermore, $X_{i,t}$ are the total number of incident cases (both reported and unreported) in time $t$. The theoretical transmission model (adapted from Finkenstadt and Grenfell) could be written as
+\begin{equation}
+X_{i,t} = \beta_t \cdot X_{i,t-1}^{\alpha_1} \cdot S_{i,t-1}^{\alpha_2}
+\end{equation}
+where $S_{i,t}$ is the number of susceptible individuals to disease $i$ at time $t$ and 
+% lifted from supplemental materials of JRSI paper
+the $\beta_t$ are a time-varying transmission parameters.  
+The $\alpha$ are mixing parameters, which, if both equal 1, define a population with homogeneous mixing whereas values not equal to 1 have been used to describe departures from mass-action mixing 
+%\cite{liu1987dynamical} 
+and to account for discretization of continuous time transmission processes 
+%\cite{glass2003interpreting}
+.
+
+
+Therefore, a statistical formulation of the theoretical transmission model would be
+\begin{eqnarray}
+\log {\mathbb E}[ X_{i,t}|X_{\cdot,t-1}, S_{i,t-1}] & = & \log\beta_t + \alpha_1 \log X_{i,t-1} + \alpha_2 \log S_{i,t-1}
+\end{eqnarray}
+where the $\beta_t$ coefficients represent the seasonal baselines, i.e. $\beta_t = \beta_{t \mod 26}$ if our timestep is biweeks. We intentionally leave the distributional assumption for $X_{i,t}$ unspecified for now, although it might be specified as Poisson or Negative Binomial.
+
+
+
+\subsection{approximating susceptibility}
+Finkenstadt and Grenfell used a Taylor series expansion to approximate the susceptible counts at each time step and to estimate the reporting fractions. Here, we propose an alternate approximation to the susceptible counts for each strain. We could say that 
+\begin{equation}
+S_{i,t} = \bar S_i \cdot \exp (\gamma M^*_{i,t})
+\end{equation}
+where $M^*_{i,t}$ is a continuous measure that acts (when exponentiated) as a scaling factor on the mean susceptibility to a particular strain, and $\gamma$ is a coefficient. The model equation then becomes:
+\begin{eqnarray}
+\log {\mathbb E}[ X_{i,t}|X_{\cdot,t-1}, S_{i,t-1}] & = & \log\beta_t + \alpha_1 \log X_{i,t-1} + \alpha_2 \left( \log \bar S_{i} + \gamma M^*_{i,t} \right )\\
+ & = & \log\beta_t + \alpha_1 \log X_{i,t-1} + \alpha_2 \log \bar S_{i} + \gamma^* M^*_{i,t}
+\end{eqnarray}
+If we can find, then, a decent measure for $M^*$, the above model should not be terribly difficult to fit.
+
+For a simple first pass at $M$, we might assume that it takes the form of a ``memory term'' that for a particular strain $i$ has two components (1) a sum of recent previous cases from strain $i$, representing recent additions to the susceptible class,  and (2) a weighted sum of prior cases of other strains, representing the current balance of those cross-protected from other strains. Assume that cases become cross-protected upon infection with other strains and leave the cross-protected pool at an exponential rate, $\theta$.  One definition of $M$ could be as follows. For a fixed $k$ (a duration into the past that we sum the prior cases) and $\theta$:
+\begin{eqnarray*}
+M_{i,t}&=& \sum_{t-k < t'< t} X_{i,t'} + \sum_{j \neq i} \sum_{t-k < t'< t} X_{j,t'}\cdot \mbox{Pr(case infected at $t'$ still protected at time $t$)} \\ 
+&=&\sum_{t-k < t'< t} X_{i,t'} +  \sum_{j \neq i}  \sum_{t-k < t'< t} X_{j,t'}\cdot e^{-\theta (t-t')}.
+\end{eqnarray*}
+Then, we can standardize the $M$ terms as 
+$$M^*_{i,t} = \frac{M_{i,t} - \bar M_i}{sd(M_{i,t})}.$$
+Then, if we use this $M^*$ term in the above model, and assume that a Poisson model is fit, we could interpret $e^{\gamma^*}$ as the relative rate between two timepoints that have the same $X_{i,t-1}$ value but where one point has 1 standard deviation greater measure of susceptibility. (this interpretation assumes that $\alpha_2 =1$.
+
+
+\subsection{Analyzing Simulated Data}
+I analyzed 12000 simulated datasets from a four-strain model with 2000 datasets at each of 6 different levels of cross-protection. The model fit to the data was 
+\begin{eqnarray}
+X_{i,t} &\sim & Poisson(\lambda_{i,t})\\
+\log \lambda_{i,t} &=& \beta_{1,i} + \beta_2 \log (X_{i,t-1}+1) + \beta_3 M^*_{i,t}
+\end{eqnarray}
+
+I fit the model above for a fixed $k=300$ and for $\lambda = 1, 2, ..., 104$ (i.e. for cross-protection values of up to 4 years). For each sequence of 104 models, across the different values of $\lambda$, the model with the highest log-likelhood value was chosen and the results reported here.
+
+The estimated $\hat\theta$ values increase as the true value of $\theta$ increases. The median values of $\hat\theta$ appear to be higher than the true values of $\theta$, a difference that is more pronounced for smaller true values of $\theta$.
+
+<<echo=FALSE, fig.cap="estimated $\\hat\\theta$ (y-axis, in biweeks) and the known true value of $\\theta$ (x-axis) faceted by the reported fraction of cases">>=
+setwd('~/Documents/code_versioned/pompSandbox/memory/')
+results <- read.csv("simResults_20140521.csv")
+results <- as.data.frame(results)
+results$trueLambda <- 26/results$delta
+results$thetaFac <- factor(results$trueLambda, labels=c("1 d", "6 mo", "1 yr", "1.5 yrs", "2 yrs", "3 yrs"))
+qplot(thetaFac, lambda, data=results, geom="boxplot", facets=.~rho) + 
+        ylab(expression(hat(theta))) + xlab(expression(theta))
+#qplot(exp(beta_M), lambda, data=results, alpha=I(.2), color=factor(trueLambda), facets=rho~trueLambda) +  theme(legend.position="none") +ylab(expression(theta)) + xlab(expression(e^beta[3]))
+@
+
+
+\end{document}

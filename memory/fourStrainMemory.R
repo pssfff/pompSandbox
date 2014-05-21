@@ -15,21 +15,30 @@ createMemory <- function(dat, k, lambda=NULL) {
         } else {
                 ## rough cumulative probabilities of still being susceptible
                 vec1 <- 1-pexp((k-1):0, rate=1/lambda)
+                ## remove most recent kstar counts from consideration to avoid autocorrelation
+                kstar <- 10
+                vec1[(k-kstar+1):k] <- 0
         }
         ## vector of 0s of length ncol(dat)-k+1
         vec0 <- rep(0, nrow(dat)-k+1)
-        ## the matrix
         memMatrixRows <- nrow(dat)-k
+
+        ## the matrix for self strain
+        firstReps <- rep(c(rep(1, k), vec0), times=memMatrixRows-1)
+        last1s <- c(rep(1, k),0)
+        memMatrixSelf <- matrix(c(firstReps, last1s), byrow=TRUE, nrow=memMatrixRows)
+        
+        ## the matrix for other strains
         firstReps <- rep(c(vec1, vec0), times=memMatrixRows-1)
         last1s <- c(vec1,0)
         memMatrix <- matrix(c(firstReps, last1s), byrow=TRUE, nrow=memMatrixRows)
-        M1 <- memMatrix%*%dat[,2] + memMatrix%*%dat[,3] + memMatrix%*%dat[,4]  
+        M1 <- memMatrixSelf%*%dat[,1] +  memMatrix%*%dat[,2] + memMatrix%*%dat[,3] + memMatrix%*%dat[,4]  
         M1 <- ( M1-mean(M1) ) / sd(M1)
-        M2 <- memMatrix%*%dat[,1] + memMatrix%*%dat[,3] + memMatrix%*%dat[,4]  
+        M2 <- memMatrix%*%dat[,1] + memMatrixSelf%*%dat[,2] +memMatrix%*%dat[,3] + memMatrix%*%dat[,4]  
         M2 <- ( M2-mean(M2) ) / sd(M2)
-        M3 <- memMatrix%*%dat[,1] + memMatrix%*%dat[,2] + memMatrix%*%dat[,4]  
+        M3 <- memMatrix%*%dat[,1] + memMatrix%*%dat[,2] + memMatrixSelf%*%dat[,3] +memMatrix%*%dat[,4]  
         M3 <- ( M3-mean(M3) ) / sd(M3)
-        M4 <- memMatrix%*%dat[,1] + memMatrix%*%dat[,2] + memMatrix%*%dat[,3]  
+        M4 <- memMatrix%*%dat[,1] + memMatrix%*%dat[,2] + memMatrix%*%dat[,3] + memMatrixSelf%*%dat[,4]
         M4 <- ( M4-mean(M4) ) / sd(M4)
         
         dataIdx <- (k+1):nrow(dat)
@@ -70,7 +79,7 @@ runCrossProtectMemoryAnalysis <- function(data, subset=NULL, k, max_lambda, plot
                 lambda <- logLiks[i,"lambda"] <- i
                 dat <- createMemory(data, k=k, lambda=lambda)
                 dat$t <- 1:nrow(dat)
-                m1 <- glm(y ~ bs(t) + log(yAR+1) + log(M), data=dat, family="poisson")
+                m1 <- glm(y ~ factor(strain) + log(yAR+1) + M, data=dat, family="poisson")
                 logLiks[i,"z"] <- summary(m1)$coef["M","z value"] #logLik(m1)
                 logLiks[i,"loglik"] <- logLik(m1)
                 logLiks[i,"beta_M"] <- summary(m1)$coef["M","Estimate"]
