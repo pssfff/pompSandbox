@@ -47,7 +47,7 @@ results$trueLambda <- 26/results$delta
 results$memoryIndicator <- results$lambda>13# abs(results$beta_M)>.02
 #results
 qplot(factor(trueLambda), lambda, data=results, geom="violin")
-qplot(factor(trueLambda), lambda, data=results, geom="boxplot")
+qplot(factor(trueLambda), lambda, data=results, geom="boxplot", facets=.~rho)
 qplot(factor(trueLambda), z, data=results, geom="violin")
 qplot(factor(trueLambda), z, data=results, geom="boxplot")
 qplot(factor(trueLambda), sign(z)*lambda, data=results, geom="boxplot")
