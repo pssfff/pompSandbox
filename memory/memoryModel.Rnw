@@ -73,20 +73,70 @@ X_{i,t} &\sim & Poisson(\lambda_{i,t})\\
 \log \lambda_{i,t} &=& \beta_{1,i} + \beta_2 \log (X_{i,t-1}+1) + \beta_3 M^*_{i,t}
 \end{eqnarray}
 
-I fit the model above for a fixed $k=300$ and for $\lambda = 1, 2, ..., 104$ (i.e. for cross-protection values of up to 4 years). For each sequence of 104 models, across the different values of $\lambda$, the model with the highest log-likelhood value was chosen and the results reported here.
+I fit the model above for a fixed $k=300$ and for $\theta = 1, 2, ..., 104$ (i.e. for cross-protection values of up to 4 years). For each sequence of 104 models, across the different values of $\theta$, the model with the highest log-likelhood value was chosen and the results reported here.
 
-The estimated $\hat\theta$ values increase as the true value of $\theta$ increases. The median values of $\hat\theta$ appear to be higher than the true values of $\theta$, a difference that is more pronounced for smaller true values of $\theta$.
+We can see from Figure \ref{fig:boxplot} shows that the estimated $\hat\theta$ values increase as the true value of $\theta$ increases. The median values of $\hat\theta$ appear to be higher than the true values of $\theta$, a difference that is more pronounced for smaller true values of $\theta$.
 
-<<echo=FALSE, fig.cap="estimated $\\hat\\theta$ (y-axis, in biweeks) and the known true value of $\\theta$ (x-axis) faceted by the reported fraction of cases">>=
+<<boxplot, echo=FALSE, fig.cap="estimated $\\hat\\theta$ (y-axis, in biweeks) and the known true value of $\\theta$ (x-axis) faceted by the reported fraction of cases">>=
 setwd('~/Documents/code_versioned/pompSandbox/memory/')
-results <- read.csv("simResults_20140521.csv")
+results <- read.csv("simResults_20140522.csv")
 results <- as.data.frame(results)
 results$trueLambda <- 26/results$delta
 results$thetaFac <- factor(results$trueLambda, labels=c("1 d", "6 mo", "1 yr", "1.5 yrs", "2 yrs", "3 yrs"))
 qplot(thetaFac, lambda, data=results, geom="boxplot", facets=.~rho) + 
         ylab(expression(hat(theta))) + xlab(expression(theta))
-#qplot(exp(beta_M), lambda, data=results, alpha=I(.2), color=factor(trueLambda), facets=rho~trueLambda) +  theme(legend.position="none") +ylab(expression(theta)) + xlab(expression(e^beta[3]))
 @
 
+
+The confidence interval coverage is terrible (i.e. less than 50\%) and the ``estimates'' of $\theta$ are also quite poor, often showing 50\% bias or greater. So this algorithm clearly has shortcomings if one is trying to draw specific inference about the duration of cross-protection, but it does appear that we could use it to evaluate whether cross-protection exists within a given system.
+<<cpPresentTable, echo=FALSE>>=
+results$cpPresent <- results$lambda_ci_low>0
+presentTable <- round(with(results, table(thetaFac, cpPresent))/20,1)
+@
+
+If we classify each dataset as either having or not having cross-protection based on whether the 95\% confidence interval for $\theta$ (based on $\chi^2$ likelihood ratio confidence intervals) includes zero, this turns out to serve as a fairly good classification rule. In particular, Table \ref{tab:present} shows that our sensitivity (the probability of correctly classifying a dataset that was generated with cross-protection as having cross-protection) ranges from between \Sexpr{min(presentTable[2:6,2])} to \Sexpr{max(presentTable[2:6,2])}, and in increases as the true duration of cross-protection lengthens. Similarly, our specificity (the probability of correctly classifying a dataset that was generated with no cross-protection) is \Sexpr{presentTable[1,1]}. The sensitivity and specificity of our previously published model on these same datasets were 100\% and 77\%, respectively.
+
+<<printTable, echo=FALSE, results='asis', message=FALSE, >>=
+require(xtable)
+xtable(presentTable, caption="Percent of datasets classified as having cross-protection (TRUE) or not (FALSE), by the true duration of cross-protection.", digits=1, label="tab:present")
+@
+
+\section{Analyzing real data}
+
+\subsection{Cross-protection between serotypes of dengue}
+
+<<echo=FALSE, message=FALSE>>=
+source('fourStrainMemory.R')
+@
+
+
+<<dengue, echo=FALSE, fig.cap="Likelihood profile for $\\theta$ in the four-serotype dengue model.", message=FALSE>>=
+## run Dengue analysis
+load("/Users/nick/Dropbox/work/research/dengueCrossProtection/data/bkk.dengue.cases.new.rda")
+dengue_data <- bkk.dengue.cases[,3:6]
+dengue_data[which(dengue_data<0, arr.ind=TRUE)] <- 0 ## remove negative values
+tmp <- runCrossProtectMemoryAnalysis(data=dengue_data, k=300, 
+                                     max_lambda=26*6, 
+                                     plot=TRUE, verbose=FALSE)
+@
+I fit the model above, to the four-serotype dengue dataset from Queen Sirikit. Using $k$=300 and setting $\theta$ to be at most six years (156 biweeks), we find that the $\hat\theta = $\Sexpr{round(tmp["lambda"])} biweeks, with a 95\% CI of (\Sexpr{round(tmp["lambda_ci_low"])}, \Sexpr{round(tmp["lambda_ci_high"])}). Overall, there is not strong evidence for cross-protection based on this analysis. Although we do not have a measure of this algorithm's performance when reporting rates are changing, as our method may rely on fairly consistent reporting over time. Figure \ref{fig:dengue} shows the likelihood profile across examined values of $\theta$. The curvature seems dramatic, but the absolute magnitude changes are quite small.
+
+\subsection{Cross-protection between common respiratory pathogens}
+We have a decade's worth of data on common respiratory pathogens from a pediatric hospital in the US. Using this data, I fit the model above to the time series of cases from subsets of the following pathogens influenza A, influenza B, RSV, adenovirus, rhinovirus, parainfluenza, and enterovirus. Some things to note:
+\begin{itemize}
+\item We might expect to pick up more spurious associations with these data on different pathogens if external factors drive these pathogens into different/shifted seasonal patterns. Our algorithm might pick up different seasonal patterns as evidence of cross-protection. A simulation study could test this out. Enterovirus might be a good example of this, as there might not be a strong biological explanation for why there would be interference between it and a respiratory pathogen.
+\item In general, we might expect the duration of cross-protection/interference to be shorter between these viruses, and this dataset is shorter than the others, so we have set $k=120$ and $\theta=100$.
+\item Still to do: generalize code to be able to look at different numbers of interacting pathogens.
+\item to investigate: impact of changing reporting rates over time on the ability of this metric to detect cross-protection.
+\end{itemize}
+
+
+<<echo=FALSE, fig.cap="Likelihood profile for $\\theta$ in a model for RSV, flu A, flu B, and parainfluenza.", message=FALSE>>=
+rsv_data <- read.csv("/Users/nick/Dropbox/work/research/maskStudy/manuscripts/ALERTv2/dataCleaned/chco.csv")
+rsv_data_subset <- rsv_data[,c("RSV", "Total.Flu.A", "Flu.B", "Paraflu")]
+tmp <- runCrossProtectMemoryAnalysis(data=rsv_data_subset, k=120, 
+                                     max_lambda=100, 
+                                     plot=TRUE, verbose=FALSE)
+@
 
 \end{document}

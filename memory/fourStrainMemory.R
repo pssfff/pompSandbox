@@ -71,12 +71,12 @@ runCrossProtectMemoryAnalysis <- function(data, subset=NULL, k, max_lambda, plot
         if(!is.null(subset)){
                 data <- data[subset,]
         }
-        nLam <- max_lambda
+        nLam <- max_lambda+1
         logLiks <- matrix(NA, ncol=5, nrow=nLam)
         colnames(logLiks) <- c("k", "lambda", "loglik", "z", "beta_M")
         for(i in 1:nLam){
                 logLiks[i,"k"] <- k
-                lambda <- logLiks[i,"lambda"] <- i
+                lambda <- logLiks[i,"lambda"] <- i-1
                 dat <- createMemory(data, k=k, lambda=lambda)
                 dat$t <- 1:nrow(dat)
                 m1 <- glm(y ~ factor(strain) + log(yAR+1) + M, data=dat, family="poisson")
@@ -90,9 +90,9 @@ runCrossProtectMemoryAnalysis <- function(data, subset=NULL, k, max_lambda, plot
         if(plot) {
                 require(gridExtra)
                 p1 <- qplot(lambda, loglik, data=data.frame(logLiks), geom="line")
-                p2 <- qplot(lambda, z, data=data.frame(logLiks), geom="line")       
-                p3 <- qplot(lambda, beta_M, data=data.frame(logLiks), geom="line")       
-                grid.arrange(p1, p2, p3, ncol=1)
+                #p2 <- qplot(lambda, z, data=data.frame(logLiks), geom="line")       
+                #p3 <- qplot(lambda, beta_M, data=data.frame(logLiks), geom="line")       
+                grid.arrange(p1, ncol=1)
         }
         
         ## find "best" lambda
@@ -102,5 +102,11 @@ runCrossProtectMemoryAnalysis <- function(data, subset=NULL, k, max_lambda, plot
                 idx_best_ll <- min(idx_best_ll)
         }
         
-        return(logLiks[idx_best_ll,])
+        ## compare likelihoods obtain chi-square based confidence interval
+        chisq_threshold <- qchisq(.95, df=1)/2
+        idx_ci_ll <- which(logLiks[,"loglik"]>=logLiks[idx_best_ll,"loglik"]-chisq_threshold)
+        ci_low <- min(logLiks[idx_ci_ll,"lambda"])
+        ci_high <- max(logLiks[idx_ci_ll,"lambda"])
+        
+        return(c(logLiks[idx_best_ll,], lambda_ci_low=ci_low, lambda_ci_high=ci_high))
 }
