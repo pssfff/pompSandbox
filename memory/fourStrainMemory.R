@@ -102,6 +102,7 @@ runCrossProtectMemoryAnalysis <- function(data, subset=NULL, k, max_lambda, plot
                 idx_best_ll <- min(idx_best_ll)
         }
         
+        
         ## compare likelihoods obtain chi-square based confidence interval
         chisq_threshold <- qchisq(.95, df=1)/2
         idx_ci_ll <- which(logLiks[,"loglik"]>=logLiks[idx_best_ll,"loglik"]-chisq_threshold)

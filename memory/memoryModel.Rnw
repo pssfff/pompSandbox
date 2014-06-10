@@ -77,7 +77,7 @@ I fit the model above for a fixed $k=300$ and for $\theta = 1, 2, ..., 104$ (i.e
 
 We can see from Figure \ref{fig:boxplot} shows that the estimated $\hat\theta$ values increase as the true value of $\theta$ increases. The median values of $\hat\theta$ appear to be higher than the true values of $\theta$, a difference that is more pronounced for smaller true values of $\theta$.
 
-<<boxplot, echo=FALSE, fig.cap="estimated $\\hat\\theta$ (y-axis, in biweeks) and the known true value of $\\theta$ (x-axis) faceted by the reported fraction of cases">>=
+<<boxplotThetas, echo=FALSE, fig.cap="estimated $\\hat\\theta$ (y-axis, in biweeks) and the known true value of $\\theta$ (x-axis) faceted by the reported fraction of cases">>=
 setwd('~/Documents/code_versioned/pompSandbox/memory/')
 results <- read.csv("simResults_20140522.csv")
 results <- as.data.frame(results)
@@ -87,6 +87,10 @@ qplot(thetaFac, lambda, data=results, geom="boxplot", facets=.~rho) +
         ylab(expression(hat(theta))) + xlab(expression(theta))
 @
 
+<<boxplotBetaMs, echo=FALSE, fig.cap="estimated $\\hat\\beta_3$ (y-axis) and the known true value of $\\theta$ (x-axis) faceted by the reported fraction of cases">>=
+qplot(thetaFac, beta_M, data=results, geom="boxplot", facets=.~rho) + 
+        ylab(expression(hat(beta)[3])) + xlab(expression(theta))
+@
 
 The confidence interval coverage is terrible (i.e. less than 50\%) and the ``estimates'' of $\theta$ are also quite poor, often showing 50\% bias or greater. So this algorithm clearly has shortcomings if one is trying to draw specific inference about the duration of cross-protection, but it does appear that we could use it to evaluate whether cross-protection exists within a given system.
 <<cpPresentTable, echo=FALSE>>=
